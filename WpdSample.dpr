@@ -39,7 +39,7 @@ uses
   Winapi.CommDlg,
   System.StrUtils,
   System.Win.ComObj,
-  PortableDeviceConsts,
+  PortableDeviceDefs,
   PortableDeviceApi;
 
 const
