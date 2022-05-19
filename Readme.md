@@ -20,3 +20,4 @@ The sample ist provided as a Delphi console application:
 - Unit **PortableDeviceApi.pas** - Delphi interface to Windows Portable Device
 - Program **WpdSample.dpr** - Sample program
  
+**Note:** Not all functions are fully tested.
