@@ -178,6 +178,7 @@ begin
           end
         else WriteErrMsg ('Invalid functional object identifier found');
         end;
+      PropVariantClear(contentType);
       end
     else write('<no functional objects found>');
     end;
@@ -208,6 +209,7 @@ begin
           end
         else WriteErrMsg ('Invalid functional object identifier found');
         end;
+      PropVariantClear(objectID);
       end
     else write('<no functional objects found>');
     end;
@@ -450,7 +452,7 @@ begin
 function ReadProfileInformationProperties (device : IPortableDevice; const functionalObjectID : string;
                                            var renderingInfoProfiles : IPortableDeviceValuesCollection) : HResult;
 var
-  hr,thr  : HResult;
+  thr  : HResult;
   renderingInfoProfilesTemp : IPortableDeviceValuesCollection;
   content : IPortableDeviceContent;
   properties  : IPortableDeviceProperties;
@@ -459,19 +461,19 @@ var
 begin
   // Get an IPortableDeviceContent interface from the IPortableDevice interface to
   // access the content-specific methods.
-  hr:=device.Content(content);
-  if failed(hr) then WriteErrMsg('Failed to get IPortableDeviceContent from IPortableDevice',hr)
+  Result:=device.Content(content);
+  if failed(Result) then WriteErrMsg('Failed to get IPortableDeviceContent from IPortableDevice',Result)
   else begin
     // Get an IPortableDeviceProperties interface from the IPortableDeviceContent interface
     // to access the property-specific methods.
-    hr:=Content.Properties(properties);
-    if failed(hr) then WriteErrMsg ('Failed to get IPortableDeviceProperties from IPortableDevice',hr)
+    Result:=Content.Properties(properties);
+    if failed(Result) then WriteErrMsg ('Failed to get IPortableDeviceProperties from IPortableDevice',Result)
     else begin
       // CoCreate an IPortableDeviceKeyCollection interface to hold the the property keys
       // we wish to read WPD_RENDERING_INFORMATION_PROFILES)
-      hr:=CoCreateInstance(CLSID_PortableDeviceKeyCollection,nil,CLSCTX_INPROC_SERVER,
+      Result:=CoCreateInstance(CLSID_PortableDeviceKeyCollection,nil,CLSCTX_INPROC_SERVER,
                       IPortableDeviceKeyCollection,propertiesToRead);
-      if succeeded(hr) then begin
+      if succeeded(Result) then begin
         // Populate the IPortableDeviceKeyCollection with the keys we wish to read.
         // NOTE: We are not handling any special error cases here so we can proceed with
         // adding as many of the target properties as we can.
@@ -479,19 +481,19 @@ begin
         if failed(thr) then WriteErrMsg ('Failed to add WPD_RENDERING_INFORMATION_PROFILES to IPortableDeviceKeyCollection',thr)
         end;
       // Call GetValues() passing the collection of specified PROPERTYKEYs.
-      if succeeded(hr) then begin
-        hr:=properties.GetValues(PChar(functionalObjectID), // The object whose properties we are reading
+      if succeeded(Result) then begin
+        Result:=properties.GetValues(PChar(functionalObjectID), // The object whose properties we are reading
                            propertiesToRead,                       // The properties we want to read
                            objectProperties);                      // Driver supplied property values for the specified object
-        if failed(hr) then WriteErrMsg (Format('Failed to get all properties for object "%s"',[functionalObjectID]),hr);
+        if failed(Result) then WriteErrMsg (Format('Failed to get all properties for object "%s"',[functionalObjectID]),Result);
         end;
       // Read the WPD_RENDERING_INFORMATION_PROFILES
-      if succeeded(hr) then begin
-        hr:=objectProperties.GetIPortableDeviceValuesCollectionValue(WPD_RENDERING_INFORMATION_PROFILES,renderingInfoProfilesTemp);
-        if failed(hr) then WriteErrMsg ('Failed to get WPD_RENDERING_INFORMATION_PROFILES from rendering information',hr);
+      if succeeded(Result) then begin
+        Result:=objectProperties.GetIPortableDeviceValuesCollectionValue(WPD_RENDERING_INFORMATION_PROFILES,renderingInfoProfilesTemp);
+        if failed(Result) then WriteErrMsg ('Failed to get WPD_RENDERING_INFORMATION_PROFILES from rendering information',Result);
         end;
       // QueryInterface the interface into the out-going parameters.
-      if succeeded(hr) then renderingInfoProfiles:=renderingInfoProfilesTemp;
+      if succeeded(Result) then renderingInfoProfiles:=renderingInfoProfilesTemp;
       end;
     end;
   end;
@@ -1052,15 +1054,12 @@ begin
 procedure ReadContentPropertiesBulkFilteringByFormat (device : IPortableDevice);
 var
   hr,thr   : HResult;
-  objectID : TPropVariant;
   context  : TGuid;
   callback : TGetBulkValuesCallback;
   Content  : IPortableDeviceContent;
   Properties : IPortableDeviceProperties;
   PropertiesBulk : IPortableDevicePropertiesBulk;
   PropertiesToRead : IPortableDeviceKeyCollection;
-  objectIDs : IPortableDevicePropVariantCollection;
-  newvalues : IPortableDeviceValues;
 const
   DEPTH = 100;
 begin
@@ -1575,6 +1574,8 @@ begin
         hr:=E_OUTOFMEMORY;
         WriteErrMsg ('Failed to delete an object from the device because we could not allocate memory for the object identifier string',hr);
         end;
+      // Free any allocated values in the PROPVARIANT before exiting
+      PropVariantClear(pv);
       end
     else WriteErrMsg ('Failed to delete an object from the device because we were returned a nullptr IPortableDevicePropVariantCollection interface pointer',hr);
     end;
@@ -2168,7 +2169,7 @@ var
   Content  : IPortableDeviceContent;
   objectProperties : IPortableDeviceValues;
   properties       : IPortableDeviceProperties;
-  propertiesToRead      : IPortableDeviceKeyCollection;
+  propertiesToRead : IPortableDeviceKeyCollection;
 begin
   // Prompt user to enter an object identifier on the device to read properties from.
   write('Enter the identifier of the object you wish to read properties from: '); readln(sel);
