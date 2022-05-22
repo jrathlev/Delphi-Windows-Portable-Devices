@@ -433,7 +433,7 @@ begin
     else begin
       // Get the number of supported commands found on the device.
       hr:=commands.GetCount(nc);
-      if failed(hr) then WriteErrMsg('Failed to get umber of supported commands',hr)
+      if failed(hr) then WriteErrMsg('Failed to get number of supported commands',hr)
       else begin
         // Loop through each functional category and find the passed in category
         if nc>0 then for i:=0 to nc-1 do begin
@@ -2748,6 +2748,7 @@ begin
         writeln('26. Update Image content (properties and data) on the device');
         writeln('27. Update Music content (properties and data) on the device');
         writeln('28. Update Contact content (properties and data) on the device');
+        writeln('29  List all resource types supported by the device');
         writeln('99. Exit');
         write('Enter number selection: '); readln(selectionIndex);
 
