@@ -1,5 +1,5 @@
-{  Defintions of types and constants for Windows Portable Device
-   =============================================================
+{  Defintions of types and constants for Windows Portable Devices
+   ==============================================================
 
    Converted from the Windows 7 C++ header file PortableDevice.h
    © Dr. J. Rathlev, D-24222 Schwentinental (kontakt(a)rathlev-home.de)

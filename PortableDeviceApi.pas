@@ -1,5 +1,5 @@
-﻿(* Delphi interface to Windows Task Scheduler 2.0
-  ==============================================
+﻿(* Delphi interface to Windows Portable Devices
+  =============================================
   Created by Delphi 10 Seattle from "PortableDeviceApi.dll"
   LIBID: {1F001332-1A57-4934-BE31-AFFC99F4EE0A}
   Notes:
