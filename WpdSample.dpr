@@ -171,7 +171,7 @@ begin
       if succeeded(hr) then begin
         // We have a content type.  It is assumed that
         // content types are returned as VT_CLSID varTypes.
-        if (contentType.vt=VT_CLSID) and (contentType.pwszVal<>nil) then begin
+        if (contentType.vt=VT_CLSID) and (contentType.puuid<>nil) then begin
           // Display the content types separated by commas
           write(ContenTypeAsString(contentType.puuid^));
           if i+1<nc then write(',');
