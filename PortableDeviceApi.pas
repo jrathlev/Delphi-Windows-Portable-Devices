@@ -284,10 +284,10 @@ type
   end;
 
 {$ALIGN 4}
-  _FILETIME = record
-    dwLowDateTime: LongWord;
-    dwHighDateTime: LongWord;
-  end;
+//  _FILETIME = record
+//    dwLowDateTime: LongWord;
+//    dwHighDateTime: LongWord;
+//  end;
 
   tagCLIPDATA = record
     cbSize: LongWord;
@@ -314,7 +314,7 @@ type
 {$ALIGN 8}
   tagSTATSTG = record
     pwcsName: PWideChar;
-    type_: LongWord;
+    dwtype: LongWord;
     cbSize: _ULARGE_INTEGER;
     mtime: _FILETIME;
     ctime: _FILETIME;
@@ -325,7 +325,7 @@ type
     grfStateBits: LongWord;
     reserved: LongWord;
   end;
-
+  TStatStg = tagSTATSTG;
 
 {$ALIGN 4}
   tagRemSNB = record
