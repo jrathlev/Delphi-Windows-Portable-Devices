@@ -43,7 +43,7 @@ unit PortableDeviceApi;
 
 interface
 
-uses Winapi.Windows, Winapi.ActiveX;
+uses Winapi.Windows, Winapi.ActiveX, IStreamApi;
 
 // *********************************************************************//
 // In der Typbibliothek deklarierte GUIDS. Die folgenden Präfixe werden verwendet:        
@@ -57,15 +57,11 @@ const
   PortableDeviceApiLibMajorVersion = 1;
   PortableDeviceApiLibMinorVersion = 0;
 
-  shlwapi32 = 'shlwapi.dll';
-
   LIBID_PortableDeviceApiLib: TGUID = '{1F001332-1A57-4934-BE31-AFFC99F4EE0A}';
 
   IID_IPortableDevice: TGUID = '{625E2DF8-6392-4CF0-9AD1-3CFA5F17775C}';
   CLASS_PortableDevice: TGUID = '{728A21C5-3D9E-48D7-9810-864848F0F404}';
   IID_IPortableDeviceValues: TGUID = '{6848F6F2-3155-4F86-B6F5-263EEEAB3143}';
-  IID_ISequentialStream: TGUID = '{0C733A30-2A1C-11CE-ADE5-00AA0044773D}';
-  IID_IStream: TGUID = '{0000000C-0000-0000-C000-000000000046}';
   IID_IStorage: TGUID = '{0000000B-0000-0000-C000-000000000046}';
   IID_IEnumSTATSTG: TGUID = '{0000000D-0000-0000-C000-000000000046}';
   IID_IRecordInfo: TGUID = '{0000002F-0000-0000-C000-000000000046}';
@@ -196,12 +192,10 @@ const
 
 type
 // *********************************************************************//
-// Forward-Deklaration von in der Typbibliothek definierten Typen                     
+// Forward-Deklaration von in der Typbibliothek definierten Typen
 // *********************************************************************//
   IPortableDevice = interface;
   IPortableDeviceValues = interface;
-  ISequentialStream = interface;
-  IStream = interface;
   IStorage = interface;
   IEnumSTATSTG = interface;
   IRecordInfo = interface;
@@ -274,16 +268,6 @@ type
 //  end;
 //  TTagPropertyKey = _tagpropertykey;
 
-{$ALIGN 8}
-  _LARGE_INTEGER = record
-    QuadPart: Int64;
-  end;
-
-  _ULARGE_INTEGER = record
-    QuadPart: Largeuint;
-  end;
-
-{$ALIGN 4}
 //  _FILETIME = record
 //    dwLowDateTime: LongWord;
 //    dwHighDateTime: LongWord;
@@ -310,24 +294,6 @@ type
     pStream: IStream;
   end;
 
-
-{$ALIGN 8}
-  tagSTATSTG = record
-    pwcsName: PWideChar;
-    dwtype: LongWord;
-    cbSize: _ULARGE_INTEGER;
-    mtime: _FILETIME;
-    ctime: _FILETIME;
-    atime: _FILETIME;
-    grfMode: LongWord;
-    grfLocksSupported: LongWord;
-    clsid: TGUID;
-    grfStateBits: LongWord;
-    reserved: LongWord;
-  end;
-  TStatStg = tagSTATSTG;
-
-{$ALIGN 4}
   tagRemSNB = record
     ulCntStr: LongWord;
     ulCntChar: LongWord;
@@ -343,7 +309,6 @@ type
     cElems: LongWord;
     pElems: ^Byte;
   end;
-
 
   _wireSAFEARR_BSTR = record
     Size: LongWord;
@@ -876,37 +841,6 @@ type
     function CopyValuesFromPropertyStore(const pStore: IPropertyStore): HResult; stdcall;
     function CopyValuesToPropertyStore(const pStore: IPropertyStore): HResult; stdcall;
     function Clear: HResult; stdcall;
-  end;
-
-// *********************************************************************//
-// Interface: ISequentialStream
-// Flags:     (0)
-// GUID:      {0C733A30-2A1C-11CE-ADE5-00AA0044773D}
-// *********************************************************************//
-  ISequentialStream = interface(IUnknown)
-    ['{0C733A30-2A1C-11CE-ADE5-00AA0044773D}']
-    function Read(out pv: Byte; cb: LongWord; out pcbRead: LongWord): HResult; stdcall;
-    function Write(var pv: Byte; cb: LongWord; out pcbWritten: LongWord): HResult; stdcall;
-  end;
-
-// *********************************************************************//
-// Interface: IStream
-// Flags:     (0)
-// GUID:      {0000000C-0000-0000-C000-000000000046}
-// *********************************************************************//
-  IStream = interface(ISequentialStream)
-    ['{0000000C-0000-0000-C000-000000000046}']
-    function Seek(dlibMove: _LARGE_INTEGER; dwOrigin: LongWord;
-                        out plibNewPosition: _ULARGE_INTEGER): HResult; stdcall;
-    function SetSize(libNewSize: _ULARGE_INTEGER): HResult; stdcall;
-    function CopyTo(pstm: IStream; cb: _ULARGE_INTEGER; out pcbRead: _ULARGE_INTEGER;
-                        out pcbWritten: _ULARGE_INTEGER): HResult; stdcall;
-    function Commit(grfCommitFlags: LongWord): HResult; stdcall;
-    function Revert: HResult; stdcall;
-    function LockRegion(libOffset: _ULARGE_INTEGER; cb: _ULARGE_INTEGER; dwLockType: LongWord): HResult; stdcall;
-    function UnlockRegion(libOffset: _ULARGE_INTEGER; cb: _ULARGE_INTEGER; dwLockType: LongWord): HResult; stdcall;
-    function Stat(out pstatstg: tagSTATSTG; grfStatFlag: LongWord): HResult; stdcall;
-    function Clone(out ppstm: IStream): HResult; stdcall;
   end;
 
 // *********************************************************************//
@@ -1502,12 +1436,6 @@ type
   end;
 
 { ---------------------------------------------------------------- }
-function SHCreateStreamOnFileEx(pszFile: LPCWSTR; grfMode,dwAttributes: DWORD; fCreate : BOOL;
-  pstmTemplate : IStream; out ppstm: IStream): HRESULT; stdcall;
-{$EXTERNALSYM SHCreateStreamOnFileEx}
-
-
-{ ---------------------------------------------------------------- }
 implementation
 
 uses System.Win.ComObj;
@@ -1581,7 +1509,5 @@ class function CoPortableDeviceWebControl.CreateRemote(const MachineName: string
 begin
   Result := CreateRemoteComObject(MachineName, CLASS_PortableDeviceWebControl) as IPortableDeviceWebControl;
 end;
-
-function SHCreateStreamOnFileEx; external shlwapi32 name 'SHCreateStreamOnFileEx';
 
 end.

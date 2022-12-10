@@ -24,6 +24,7 @@
    the specific language governing rights and limitations under the License.
 
    Vers. 1 - May 2022
+   last modified:  December 2022
    *)
 
 program WpdSample;
@@ -39,6 +40,7 @@ uses
   Winapi.CommDlg,
   System.StrUtils,
   System.Win.ComObj,
+  IStreamApi,
   PortableDeviceDefs,
   PortableDeviceApi;
 
@@ -483,8 +485,8 @@ begin
       // Call GetValues() passing the collection of specified PROPERTYKEYs.
       if succeeded(Result) then begin
         Result:=properties.GetValues(PChar(functionalObjectID), // The object whose properties we are reading
-                           propertiesToRead,                       // The properties we want to read
-                           objectProperties);                      // Driver supplied property values for the specified object
+                           propertiesToRead,                    // The properties we want to read
+                           objectProperties);                   // Driver supplied property values for the specified object
         if failed(Result) then WriteErrMsg (Format('Failed to get all properties for object "%s"',[functionalObjectID]),Result);
         end;
       // Read the WPD_RENDERING_INFORMATION_PROFILES
@@ -1235,9 +1237,9 @@ begin
     // Populate the IPortableDeviceKeyCollection with WPD_OBJECT_NAME.
     PropertiesToRead.Add(WPD_OBJECT_NAME);
     PropertiesToRead.Add(WPD_OBJECT_FORMAT);
-    hr:=properties.GetValues(PChar(objectID),    // The object whose properties we are reading
-                      PropertiesToRead,   // The properties we want to read
-                      objectProperties);  // Driver supplied property values for the specified object
+    hr:=properties.GetValues(PChar(objectID),  // The object whose properties we are reading
+                      PropertiesToRead,        // The properties we want to read
+                      objectProperties);       // Driver supplied property values for the specified object
     if failed(hr) then Result:=ErrorMsg(Format('Failed to get properties for object "%s"',[objectID]),hr)
     else Result:=StringPropertyAsString(objectProperties,WPD_OBJECT_NAME,'');
     end;
@@ -1507,7 +1509,7 @@ begin
         tbw:=0;
         // Since we have IStream-compatible interfaces, call our helper function
         // that copies the contents of a source stream into a destination stream.
-        hr:=StreamCopy(finalFileStream,              // Destination (The Final File to transfer to)
+        hr:=StreamCopy(finalFileStream,  // Destination (The Final File to transfer to)
                        objectDataStream, // Source (The Object's data to transfer from)
                        otsz,             // The driver specified optimal transfer buffer size
                        tbw);             // The total number of bytes transferred from device to the finished file
@@ -1836,15 +1838,15 @@ begin
         hr:=GetRequiredPropertiesForContentType(contentType,              // Content type of the data
                                                 dest,                     // Parent to transfer the data under
                                                 fp,                       // Full file path to the data file
-                                                fileStream,                      // Open IStream that contains the data
-                                                finalObjectProperties);                     // Returned properties describing the data
+                                                fileStream,               // Open IStream that contains the data
+                                                finalObjectProperties);   // Returned properties describing the data
         if failed(hr) then WriteErrMsg ('Failed to get required properties needed to transfer a file to the device',hr)
         else begin
           pnul:=nil;
           // 4) Transfer for the content to the device
-          hr:=Content.CreateObjectWithPropertiesAndData(finalObjectProperties,      // Properties describing the object data
-                                                tempStream,       // Returned object data stream (to transfer the data to)
-                                                otsz,     // Returned optimal buffer size to use during transfer
+          hr:=Content.CreateObjectWithPropertiesAndData(finalObjectProperties,  // Properties describing the object data
+                                                tempStream,  // Returned object data stream (to transfer the data to)
+                                                otsz,        // Returned optimal buffer size to use during transfer
                                                 pnul);
           // Once we have a the IStream returned from CreateObjectWithPropertiesAndData,
           // QI for IPortableDeviceDataStream so we can use the additional methods
@@ -1857,10 +1859,10 @@ begin
           // Since we have IStream-compatible interfaces, call our helper function
           // that copies the contents of a source stream into a destination stream.
           if succeeded(hr) then begin
-            hr:=StreamCopy(finalObjectDataStream,        // Destination (The Final File to transfer to)
-                           fileStream,        // Source (The Object's data to transfer from)
-                           otsz,       // The driver specified optimal transfer buffer size
-                           tbw);       // The total number of bytes transferred from device to the finished file
+            hr:=StreamCopy(finalObjectDataStream,  // Destination (The Final File to transfer to)
+                           fileStream,             // Source (The Object's data to transfer from)
+                           otsz,                   // The driver specified optimal transfer buffer size
+                           tbw);                   // The total number of bytes transferred from device to the finished file
             if failed(hr) then WriteErrMsg ('Failed to transfer object to device',hr);
             end
           else WriteErrMsg ('Failed to get IStream (representing destination object data on the device) from IPortableDeviceContent',hr);
@@ -2033,11 +2035,11 @@ begin
     // 2) Get the properties that describe the object being created on the device
     hr:=GetRequiredPropertiesForFolder(sel,      // Parent to create the folder under
                                        dir,      // Folder Name
-                                       finalObjectProperties);     // Returned properties describing the folder
+                                       finalObjectProperties);  // Returned properties describing the folder
     if failed(hr) then WriteErrMsg ('Failed to get required properties needed to transfer an image file to the device',hr)
     else begin
       // 3) Transfer the content to the device by creating a properties-only object
-      hr:=Content.CreateObjectWithPropertiesOnly(finalObjectProperties,newlyCreatedObject);      // Properties describing the object data
+      hr:=Content.CreateObjectWithPropertiesOnly(finalObjectProperties,newlyCreatedObject);  // Properties describing the object data
       if succeeded(hr) then writeln(Format('The folder "%s" was created on the device.'+sLineBreak
                                           +'The newly created object''s ID is "%s"',[dir,newlyCreatedObject]))
       else WriteErrMsg ('Failed to create a new folder on the device',hr);
@@ -2129,17 +2131,17 @@ begin
        // 5) Transfer for the content to the device
         else begin
           pnul:=nil;
-          hr:=resources.CreateResource(resourceAttributes,      // Properties describing this resource
-                                 resourceStream,       // Returned resource data stream (to transfer the data to)
-                                 otsz,     // Returned optimal buffer size to use during transfer
+          hr:=resources.CreateResource(resourceAttributes,  // Properties describing this resource
+                                 resourceStream,            // Returned resource data stream (to transfer the data to)
+                                 otsz,                      // Returned optimal buffer size to use during transfer
                                  pnul);
           // Since we have IStream-compatible interfaces, call our helper function
           // that copies the contents of a source stream into a destination stream.
           if succeeded(hr) then begin
-            hr:=StreamCopy(resourceStream,         // Destination (The Final File to transfer to)
+            hr:=StreamCopy(resourceStream,    // Destination (The Final File to transfer to)
                            fileStream,        // Source (The Object's data to transfer from)
-                           otsz,       // The driver specified optimal transfer buffer size
-                           tbw);       // The total number of bytes transferred from device to the finished file
+                           otsz,              // The driver specified optimal transfer buffer size
+                           tbw);              // The total number of bytes transferred from device to the finished file
             if failed(hr) then WriteErrMsg ('Failed to transfer object from device',hr);
             end
           else WriteErrMsg ('Failed to get IStream (representing destination object data on the device) from IPortableDeviceContent',hr);
@@ -2281,9 +2283,9 @@ begin
         end;
       // 6) Call SetValues() passing the collection of specified PROPERTYKEYs.
       if succeeded(hr) then begin
-        hr:=properties.SetValues(PChar(sel),        // The object whose properties we are setting
-                          objectPropertiesToWrite,               // The properties we want to set
-                          propertyWriteResults);              // Driver supplied property result values for the property set operation
+        hr:=properties.SetValues(PChar(sel),         // The object whose properties we are setting
+                          objectPropertiesToWrite,   // The properties we want to set
+                          propertyWriteResults);     // Driver supplied property result values for the property set operation
         if failed(hr) then WriteErrMsg (Format('Failed to set properties for object "%s"',[sel]),hr)
         else writeln(Format('The WPD_OBJECT_NAME property on object "%s" was written successfully (Read the properties again to see the updated value)',[sel]));
         end;
@@ -2471,9 +2473,9 @@ begin
       // 5) Transfer for the content to the device
       if succeeded(hr) then begin
         hr:=content2.UpdateObjectWithPropertiesAndData(PChar(sel),
-                                                       finalObjectProperties,      // Properties describing the object data
-                                                       tempStream,                 // Returned object data stream (to transfer the data to)
-                                                       otsz);                      // Returned optimal buffer size to use during transfer
+                                                       finalObjectProperties,  // Properties describing the object data
+                                                       tempStream,             // Returned object data stream (to transfer the data to)
+                                                       otsz);                  // Returned optimal buffer size to use during transfer
         // Once we have a the IStream returned from UpdateObjectWithPropertiesAndData,
         // QI for IPortableDeviceDataStream so we can use the additional methods
         // to get more information about the object (i.e. The newly created object
