@@ -16,8 +16,8 @@ into pas files. The sample demonstrates the following tasks using the WPD API:
 
 The sample ist provided as a Delphi console application:
 
+- Unit **IStreamApi.pas** - Replaces some declarations in Winpai.ActiveX
 - Unit **PortableDeviceDefs.pas** - Types and constants from PortableDevice.h
 - Unit **PortableDeviceApi.pas** - Delphi interface to Windows Portable Device
 - Program **WpdSample.dpr** - Sample program
  
-**Note:** Not all functions are fully tested.
