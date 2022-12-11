@@ -36,3 +36,5 @@ The Delphi VCL sample demonstrates the following tasks:
 - Unit **PortableDeviceApi.pas** - Delphi interface to Windows Portable Device
 - Unit **PortableDeviceUtils.pas** - Objects and functions to access Windows Portable Devices
 - Unit **FileUtils.pas** - Type definitions and functions for PortableDeviceUtils.pas 
+
+[Executable demos](https://github.com/jrathlev/Delphi-Windows-Portable-Device/tree/master/demo)
