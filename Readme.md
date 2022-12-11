@@ -1,4 +1,4 @@
-### Delphi interface to Windows Portable Device
+# Delphi interface to Windows Portable Device
 
 The use of the Portable Device interface is demonstrated by a sample program
 provided by Microsoft at [GitHub](https://github.com/microsoft/Windows-classic-samples/tree/main/Samples/PortableDeviceCOM). 
@@ -7,8 +7,8 @@ Windows Portable Device functions under Delphi, it is first necessary to convert
 the required header files into Delphi units and then to translate the cpp files
 into pas files. 
 
-The sample demonstrates the following tasks using the WPD API:
-  
+## Console application sample
+The sample demonstrates the following tasks using the WPD API:  
 - Enumerate portable devices
 - Enumerate content on a portable device
 - Query the capabilities of a portable device
@@ -16,16 +16,21 @@ The sample demonstrates the following tasks using the WPD API:
 - Transfer content on or off for a portable device
 - Register or unregister for portable device events
 
-The sample is provided as a Delphi console application:
+#### Files:
+- **WpdSample.dpr** - Sample program
 
-- Program **WpdSample.dpr** - Sample program
+## VCL applcation sample:
+The Delphi VCL sample demonstrates the following tasks:
+- Building a list of available portable devices
+- Building a directory tree of the selected portable device
+- Selecting a directory and displaying the associated files
+- Copying the selected files to a Windows directory
 
-Delphi VCL sample to copy files from a portable device to a Windows directory:
-
-- Program **PortableCopy.dpr** - VCL sample project file
+#### Files:
+- **PortableCopy.dpr** - VCL sample project file
 - Unit **PortCopyMain.pas** - Main unit of sample project
 
-Required units:
+## Required units:
 - Unit **IStreamApi.pas** - Replaces some declarations in Winapi.ActiveX
 - Unit **PortableDeviceDefs.pas** - Types and constants from PortableDevice.h
 - Unit **PortableDeviceApi.pas** - Delphi interface to Windows Portable Device
