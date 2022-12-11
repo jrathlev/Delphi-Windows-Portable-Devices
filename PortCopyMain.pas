@@ -323,7 +323,7 @@ begin
 const
   defBufferSize = 512*1024;     // default buffer size for copy operations
 
-function CopyPortableFile (const ASource : TFileData; const ADestName : string) : integer;
+procedure CopyPortableFile (const ASource : TFileData; const ADestName : string);
 var
   sDest : TFileStream;
   FBuffer : array of byte;
