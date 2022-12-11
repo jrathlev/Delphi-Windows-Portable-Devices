@@ -2,8 +2,7 @@ program PortableCopy;
 
 uses
   Vcl.Forms,
-  PortCopyMain in 'PortCopyMain.pas' {MainForm},
-  FileUtils in 'FileUtils.pas';
+  PortCopyMain in 'PortCopyMain.pas' {MainForm};
 
 {$R *.res}
 
