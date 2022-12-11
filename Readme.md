@@ -22,11 +22,11 @@ The sample is provided as a Delphi console application:
 
 Delphi VCL sample to copy files from a portable device to a Windows directory:
 
-- Program **PortableCopy.dpr** - Delphi project file
-- Unit **PortCopyMain.pas** - Main unit of project
+- Program **PortableCopy.dpr** - VCL sample project file
+- Unit **PortCopyMain.pas** - Main unit of sample project
 
 Required units:
-- Unit **IStreamApi.pas** - Replaces some declarations in Winpai.ActiveX
+- Unit **IStreamApi.pas** - Replaces some declarations in Winapi.ActiveX
 - Unit **PortableDeviceDefs.pas** - Types and constants from PortableDevice.h
 - Unit **PortableDeviceApi.pas** - Delphi interface to Windows Portable Device
 - Unit **PortableDeviceUtils.pas** - Objects and functions to access Windows Portable Devices
