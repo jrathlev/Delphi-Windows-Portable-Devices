@@ -1,0 +1,187 @@
+Accessing the data on an Android smartphone
+===========================================
+
+When a smartphone is connected to a Windows computer, the contents are not
+not included in its file system, as is the case with USB storage devices, for 
+example. Therefore you can't use the common functions of the Windows API, like 
+FindFirst/FindNext or FileExists, to access these files.
+
+The reason for this is that such devices are connected via the Media Transport 
+Protocol (MTP). To access the contents, you need the functions of the
+of the Windows Portable Devices Interface (WPD).
+https://docs.microsoft.com/en-us/windows/win32/windows-portable-devices
+
+1. WPD under Delphi
+-------------------
+The units, which are necessary, in order to be able to use the WPD functions 
+in own Delphi programs are unfortunately not part of the system libraries.
+
+I have therefore created the following two units, which allow the use of
+WPD in own Delphi programs.
+
+1. "PortableDeviceDefs.pas" containig the definitions of all required constants:
+For this I converted the C++ header file "PortableDevice.h" contained in the 
+Windows SDK to Delphi.
+
+2. "PortableDeviceApi.pas" with the declarations of the required COM interfaces:
+This unit can be imported via the Delphi IDE "Import type library" function from 
+the System-DLL "PortableDeviceApi.dll". Afterwards still some minor corrections 
+by hand were necessary.
+
+These units are provided in this GitHub repository.
+
+2. Access using the Windows Shell
+---------------------------------
+If it is only a question of copying individual files from the device to another
+data medium, e.g. the internal hard disk, there is a much simpler way.
+If you open the Windows Explorer, you will find the connected device under
+"This PC". Click on it, the device itself and any memory cards connected 
+to it are listed. Below this the directory structure will open in the usual way. 
+Selecting and copying files can be performed in the familiar way. 
+
+The functions of the Windows Shell, as they are used by the Explorer, can be
+accessed from Delphi using the system library unit "Vcl.Shell.ShellCtrls.pas".
+They will allow you to display the files on the connected device. However, to do 
+this is a bit tricky and will be described in the following.
+
+2.1. Selecting the initial path
+-------------------------------
+First you place on the main form the components "ShellTreeView" and "ShellListView". 
+Both are coupled in the design mode via the corresponding properties. You can use 
+the property "ShellTreeView.Path" in your program to define the initial directory.
+If it is located on a conventional data medium and therefore belongs to the normal 
+file system, you simply specify the path in the usual way, e.g. "C:\ProgramData\Common Files\".
+However, this does not work if it is a path on the connected device. The correct 
+specification can be determined by trial and error. Create an "OnClick" event for 
+"ShellTreeView" for this purpose with the following program code:
+
+procedure TMainForm.ShellTreeViewClick(Sender: TObject);
+var
+  pn : PWideChar;
+  sa,se : string;
+  n1,n2 : integer;
+begin
+  with ShellTreeView.SelectedFolder do begin
+    if (fpFileSystem in Properties) then LastPath:=PathName
+    else begin
+      OleCheck(SHGetNameFromIDList(AbsoluteID,SIGDN_DESKTOPABSOLUTEPARSING,pn));
+      sa:=pn; CoTaskMemFree(pn); pn:=nil;
+      OleCheck(SHGetNameFromIDList(AbsoluteID,SIGDN_DESKTOPABSOLUTEEDITING,pn));
+      se:=pn; CoTaskMemFree(pn); pn:=nil;
+      n1:=pos('\\\?\',sa);
+      n1:=pos('\',sa,n1+5);
+      if n1>0 then begin
+        n2:=pos('\',se);
+        n2:=pos('\',se,n2+1);
+        LastPath:=copy(sa,1,n1)+copy(se,n2+1,length(se));
+        end
+      else LastPath:=sa;
+      end;
+    Label1.Caption:=LastPath;
+    end;
+  end;
+
+Explanation: Common paths have the property "fpFileSystem" set and the path can 
+be taken directly. Otherwise you have to use the function "SHGetNameFromIDList" 
+to determine two different paths associated to then "AbsoluteID" of the
+"SelectedFolder":
+
+1. SIGDN_DESKTOPABSOLUTEPARSING: Returns the internal path name (Parsing name)
+The particular parts of the path are described by Guids or some other cryptic
+notations, like
+::{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\\?\usb#vid_2717&pid_ff40#062539717d28#{6ac27878-a6fa-4155-ba85-f98f491d4f33}\SID-{20001,,31611420672}\{703540AE-0000-0000-0000-000000000000}\{0AE02E9E-0000-0000-0000-000000000000}
+
+2. SIGDN_DESKTOPABSOLUTEEDITING: Returns the name as it is displayed on the 
+Desktop, like: "This PC\Galaxy A51\SD card\DCIM\Camera"
+
+If you now try to assign one of the two paths determined in this way to the property
+"ShellTreeView.Path", the error message "Wrong parameter" is displayed in both cases.
+You have to combine the two paths. From the parsing name you need the first two 
+parts, from the second the remainder:
+::{20D04FE0-3AEA-1069-A2D8-08002B30309D}\\\?\usb#vid_2717&pid_ff40#062539717d28#{6ac27878-a6fa-4155-ba85-f98f491d4f33}\SD card\DCIM\Camera
+
+After assigning this to "ShellTreeView.Path", the path will be accepted and displayed 
+in the directory tree.
+
+More info:
+https://en.delphipraxis.net/topic/4827-parse-pidl-from-name-located-on-portable-device/
+
+2.2. Copying files
+------------------
+Activate the property "MultiSelect" in "ShellListView" to enable the selection of
+multiple files. Click a provided button to run the following code:
+
+procedure TMainForm.bbCopyClick(Sender: TObject);
+var
+  i,n,j : integer;
+  fileOp : IFileOperation;
+  siSrcList : IShellItemArray;
+  idList : array of PItemIDList;
+  siSrcFile,siDestFolder : IShellItem;
+begin
+  with ShellListView do if assigned(Selected) then begin
+    n:=Selected.Index;
+    OleCheck(CoCreateInstance(CLSID_FileOperation,nil,CLSCTX_ALL,IFileOperation,fileOp));
+    if SelCount=1 then with SelectedFolder do begin
+      OleCheck(SHCreateItemFromIDList(AbsoluteID,IShellItem,siSrcFile));
+      OleCheck(SHCreateItemFromParsingName(PChar(edDestDir.Text),nil,IShellItem,siDestFolder));
+      OleCheck(fileOp.CopyItem(siSrcFile,siDestFolder,pchar(DisplayName),nil));
+      OleCheck(fileOp.PerformOperations);
+      end
+    else begin
+      SetLength(idList,SelCount); j:=0;
+      OleCheck(fileOp.SetOperationFlags(FOF_FILESONLY+FOF_NOCONFIRMMKDIR+FOF_NO_CONNECTED_ELEMENTS));
+      for i:=n to Items.Count-1 do if Items[i].Selected then begin
+        idList[j]:=Folders[i].AbsoluteID; inc(j);
+        end;
+      OleCheck(SHCreateShellItemArrayFromIDLists(SelCount,@idList[0],siSrcList));
+      OleCheck(SHCreateItemFromParsingName(PChar(edDestDir.Text),nil,IShellItem,siDestFolder));
+      OleCheck(fileOp.CopyItems(siSrcList,siDestFolder));
+      OleCheck(fileOp.PerformOperations);
+      idList:=nil;
+      end;
+    end;
+  end;
+
+Explanation: The "IFileOperation" function is used for copying. The destination 
+directory exists as an ordinary path and is passed to "SHCreateItemFromParsingName"
+to create the corresponding "IShellItem". This does not work for the file on the 
+connected device (see above). You must use the "AbsoluteID" of "SelectedFolder"
+in connection with the "SHCreateItemFromIDList" function to get the corresponding 
+"IShellItem".
+
+If multiple files were selected, you need to create an array "idList" with the 
+selected "AbsoluteIDs" and then use "SHCreateShellItemArrayFromIDLists" to create 
+a list of the target "IShellItems".
+
+2.3. Determining an ObjectID for Windows Portable Devices
+---------------------------------------------------------
+Use "SHCreateItemFromIDList" to create the corresponding "IShellItem2" from the 
+"AbsoluteID" of the selected item. This will allow to query the property 
+"WPD_OBJECT_ID" to get the associated "WPD ObjectID". By the way, this method can 
+also be used to determine other properties, such as "WPD_OBJECT_DATE_MODIFIED" 
+for the modification time of the file.
+
+The ObjectID obtained in this way can then be also used in the functions for 
+Windows Portable Devices (see section 1 above).
+
+procedure TMainForm.ShellListViewClick(Sender: TObject);
+var
+  si : IShellItem2;
+  pv : TPropVariant;
+  ObjectID : string;
+begin
+  with ShellListView do if assigned(Selected) then begin
+    ff:=Folders[Selected.Index];
+    with ff do begin
+      OleCheck(SHCreateItemFromIDList(AbsoluteID,IShellItem2,si));
+      OleCheck(si.GetProperty(WPD_OBJECT_ID,pv);
+      ObjectID:=pv.pwszVal;
+      PropVariantClear(pv);
+      end;
+    Label1.Caption:=ObjectID;
+    end;
+  end;
+
+J. Rathlev, December 2022
+ 
