@@ -33,7 +33,7 @@ The Delphi VCL sample demonstrates the following tasks:
 ## Required units:
 - Unit **IStreamApi.pas** - Replaces some declarations in Winapi.ActiveX
 - Unit **PortableDeviceDefs.pas** - Types and constants from PortableDevice.h
-- Unit **PortableDeviceApi.pas** - Delphi interface to Windows Portable Device
+- Unit **PortableDeviceApi.pas** - Delphi interface to Windows Portable Devices
 - Unit **PortableDeviceUtils.pas** - Objects and functions to access Windows Portable Devices
 - Unit **FileUtils.pas** - Type definitions and functions for PortableDeviceUtils.pas 
 
