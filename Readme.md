@@ -1,9 +1,9 @@
-# Delphi interface to Windows Portable Device
+# Delphi interface to Windows Portable Devices
 
-The use of the Portable Device interface is demonstrated by a sample program
+The use of the Portable Devices interface is demonstrated by a sample program
 provided by Microsoft at [GitHub](https://github.com/microsoft/Windows-classic-samples/tree/main/Samples/PortableDeviceCOM). 
 The source code is written in C++ and requires Visual Studio. To use the
-Windows Portable Device functions under Delphi, it is first necessary to convert 
+Windows Portable Devices functions under Delphi, it is first necessary to convert 
 the required header files into Delphi units and then to translate the cpp files
 into pas files. 
 
