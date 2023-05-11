@@ -13,7 +13,7 @@
    the specific language governing rights and limitations under the License.
 
    J. Rathlev, June 2022
-   last modified: December 2022
+   last modified: May 2023
    *)
 
 unit PortCopyMain;
@@ -22,8 +22,8 @@ interface
 
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
-  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls,
-  IStreamApi, PortableDeviceApi, PortableDeviceUtils, Vcl.ExtCtrls;
+  Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, Vcl.ExtCtrls,
+  IStreamApi, FileUtils, PortableDeviceApi, PortableDeviceUtils;
 
 type
   TMainForm = class(TForm)
@@ -50,6 +50,7 @@ type
     Label5: TLabel;
     Label6: TLabel;
     btnShowDirs: TButton;
+    laStatus: TLabel;
     procedure FormCreate(Sender: TObject);
     procedure FormDestroy(Sender: TObject);
     procedure FormShow(Sender: TObject);
@@ -67,6 +68,7 @@ type
     Device : TPortableDevice;
     procedure ReloadDeviceList;
     procedure ShowDeviceProps;
+    procedure RefreshStatus(Index : integer; AObjectID : string);
     procedure BuildFileList (AIndex : integer);
     procedure AddTreeLevel (node : TTreeNode; AParent : TPortableDeviceObject);
     procedure BuildTree;
@@ -81,7 +83,7 @@ implementation
 
 {$R *.dfm}
 
-uses Vcl.FileCtrl, System.RTLConsts, FileUtils;
+uses Vcl.FileCtrl, System.RTLConsts, ExtFileUtils;
 
 { ---------------------------------------------------------------- }
 const
@@ -148,6 +150,7 @@ begin
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
   DevManager:=TPortableDeviceManager.Create;
+  FolderDialog.DefaultFolder:=ExtractFilePath(Application.ExeName);
   end;
 
 procedure TMainForm.FormDestroy(Sender: TObject);
@@ -242,6 +245,14 @@ begin
     end;
   end;
 
+procedure TMainForm.RefreshStatus(Index : integer; AObjectID : string);
+begin
+  if Index mod 10 = 0 then begin
+    laStatus.Caption:=Format('%u objects found',[Index]);
+    Application.ProcessMessages;
+    end;
+  end;
+
 procedure TMainForm.BuildTree;
 var
   node : TTreeNode;
@@ -254,7 +265,7 @@ begin
     BeginUpdate;
     end;
   with Device.Content do begin
-    Refresh;
+    Refresh(RefreshStatus);
     pdo:=DeviceObject;
     if assigned(pdo) then begin
       sn:=pdo.ObjectName;
@@ -263,6 +274,7 @@ begin
       AddTreeLevel(node,pdo);
       node.Expand(false);
       end;
+    laStatus.Caption:=Format('%u objects found',[ObjectCount]);
     end;
   tvObjects.Items.EndUpdate;
   Screen.Cursor:=crDefault;
@@ -374,7 +386,7 @@ begin
       PDObject:=Device.Content.Objects[n];
       with PDObject do begin
         with laPath do Caption:=MinimizeName(ObjectName,Canvas,paCopy.Width-2*Left);
-        sd:=AddPath(Dest,ExtractFilename(ObjectName));
+        sd:=IncludeTrailingPathDelimiter(Dest)+ExtractFilename(ObjectName);
         GetFileData(FileData,true);
         end;
       try
