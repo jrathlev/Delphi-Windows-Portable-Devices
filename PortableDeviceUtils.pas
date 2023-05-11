@@ -20,7 +20,8 @@ unit PortableDeviceUtils;
 interface
 
 uses System.SysUtils, System.Classes, System.Contnrs, Winapi.Windows, Winapi.ActiveX,
-  Winapi.ShlObj, Vcl.ComCtrls, IStreamApi, FileUtils, PortableDeviceDefs, PortableDeviceApi;
+  Winapi.ShlObj, Vcl.ComCtrls, IStreamApi, ExtFileUtils,
+  PortableDeviceDefs, PortableDeviceApi;
 
 const
   CLIENT_NAME         = 'Delphi PortableDeviceUtils';
@@ -32,6 +33,32 @@ const
   DeviceTypes : array of string = ['Generic','Camera','Media Player','Phone',
                     'Video','Personal Information Manager','Audio Recorder'];
 
+type
+  TContentType = (ctUnknown, ctFunctionalObject, ctFolder, ctImage, ctDocument,
+    ctContact, ctContactGroup, ctAudio, ctVideo, ctTelevision, ctPlayList,
+    ctMixedContentAlbum, ctAudioAlbum, ctImageAlbum, ctVideoAlbum, ctMemo,
+    ctEmail, ctAppointment, ctTask, ctProgram, ctGenericFile, ctCalendar,
+    ctGenericMessage, ctNetworkAssociation, ctTypeCertificate, ctWirelessProfile,
+    ctMediaCast, ctSection, ctUnspecified);
+
+  TObjectType = (otUnknown,otDevice,otRoot,otFolder,otFile);
+  TObjectTypes = set of TObjectType;
+
+  TObjectProperty = (opCreationTime,opLastWriteTime,opSize);
+
+  TFindObjects = procedure (Index : integer; AObjectID : string) of Object;
+
+  TObjectFormat = (ofUnknown, ofScript, ofExecutable, ofText, ofHtml, ofDigPrintOrder,
+    ofAudioInterchange, ofWave, ofMp3, ofAvi, ofMpeg, ofAdvStream, ofExif, ofTiffEp,
+    ofFlashOix, ofBmp, ofCamImg, ofGif, ofJpgInterchange, ofPtCloudData, ofPict, ofPng,
+    ofTiff, ofTiffIt, ofJp2, ofJpX, ofWinImg, ofWma, ofWmv, ofWplPlaylist, ofM3uPlaylist,
+    ofMplPlaylist, ofAsxPlaylist, ofPlsPlaylist, ofAbstractContactGroup, ofAbstractMediaCast,
+    ofVCalendar, ofICalendar, ofAbstractContact, ofVCard2, ofVCard3, ofIcon, ofXml,
+    ofAdvAudioCoding, ofAudible, ofFlac, ofOgg, ofMp4, ofM4a, ofMp2, ofMSWord,
+    ofCompiledHtml, ofMSExel, ofMSPowerpoint, ofNetworkAssoc, ofX509Ceritficate,
+    ofMSWfc, of3Gp, of3Gpa, ofPropsOnly);
+
+const
   ContentTypeGuids : array of PGuid = [
     @WPD_CONTENT_TYPE_ALL,
     @WPD_CONTENT_TYPE_FUNCTIONAL_OBJECT,
@@ -125,30 +152,11 @@ const
     @WPD_OBJECT_FORMAT_3GPA,
     @WPD_OBJECT_FORMAT_PROPERTIES_ONLY];
 
-type
-  TContentType = (ctUnknown, ctFunctionalObject, ctFolder, ctImage, ctDocument,
-    ctContact, ctContactGroup, ctAudio, ctVideo, ctTelevision, ctPlayList,
-    ctMixedContentAlbum, ctAudioAlbum, ctImageAlbum, ctVideoAlbum, ctMemo,
-    ctEmail, ctAppointment, ctTask, ctProgram, ctGenericFile, ctCalendar,
-    ctGenericMessage, ctNetworkAssociation, ctTypeCertificate, ctWirelessProfile,
-    ctMediaCast, ctSection, ctUnspecified);
+  ObjectPropertyGuids : array [TObjectProperty] of PPropertyKey = (
+    @WPD_OBJECT_DATE_CREATED,
+    @WPD_OBJECT_DATE_MODIFIED,
+    @WPD_OBJECT_SIZE);
 
-  TObjectType = (otUnknown,otDevice,otRoot,otFolder,otFile);
-  TObjectTypes = set of TObjectType;
-
-  TFindObjects = procedure (Index : integer; AObjectID : string) of Object;
-
-  TObjectFormat = (ofUnknown, ofScript, ofExecutable, ofText, ofHtml, ofDigPrintOrder,
-    ofAudioInterchange, ofWave, ofMp3, ofAvi, ofMpeg, ofAdvStream, ofExif, ofTiffEp,
-    ofFlashOix, ofBmp, ofCamImg, ofGif, ofJpgInterchange, ofPtCloudData, ofPict, ofPng,
-    ofTiff, ofTiffIt, ofJp2, ofJpX, ofWinImg, ofWma, ofWmv, ofWplPlaylist, ofM3uPlaylist,
-    ofMplPlaylist, ofAsxPlaylist, ofPlsPlaylist, ofAbstractContactGroup, ofAbstractMediaCast,
-    ofVCalendar, ofICalendar, ofAbstractContact, ofVCard2, ofVCard3, ofIcon, ofXml,
-    ofAdvAudioCoding, ofAudible, ofFlac, ofOgg, ofMp4, ofM4a, ofMp2, ofMSWord,
-    ofCompiledHtml, ofMSExel, ofMSPowerpoint, ofNetworkAssoc, ofX509Ceritficate,
-    ofMSWfc, of3Gp, of3Gpa, ofPropsOnly);
-
-const
   FileObjects : set of TContentType = [ctImage, ctDocument, ctContact, ctAudio,
     ctVideo, ctTelevision, ctPlayList, ctMemo, ctEmail, ctProgram, ctGenericFile,
     ctCalendar, ctGenericMessage, ctTypeCertificate,ctMediaCast, ctUnspecified];
@@ -202,8 +210,9 @@ type
     function GetFileStream (var AStreamData : TFileStreamData) : HResult;
     procedure AddChild (AIndex : integer);
     function GetChildByName (const AName : string) : TPortableDeviceObject;
-    function GetProperty (const PropertyKey : TPropertyKey; var pv : TPropVariant) : HResult;
 //    property ChildObjectCount : integer read FChildObjectCount;
+    function GetProperty (const PropertyKey : TPropertyKey; var pv : TPropVariant) : HResult;
+    function CanWriteProperty (ObjectProperty : TObjectProperty) : boolean;
     property ContentType : TGuid read GetContentType;
     property Index : integer read FIndex;
     property Level : integer read FLevel;
@@ -229,6 +238,7 @@ type
     procedure FindObjects (const AObjectID : string; AParent : TPortableDeviceObject);
     function GetObjectCount : integer;
     function GetRootCount : integer;
+    function GetFolderCount : integer;
     function GetObject (Index : integer) : TPortableDeviceObject;
     function GetDevObject : TPortableDeviceObject;
     function GetRootObject (Index : integer) : TPortableDeviceObject;
@@ -239,9 +249,11 @@ type
     function FindNextObject (AObjectType : TObjectType; var AIndex : integer) : TPortableDeviceObject;
     function GetObjectByID (const AObjectID : string) : TPortableDeviceObject;
     function GetObjectByPath (APath : string) : TPortableDeviceObject;
+    function GetObjectIndexByPath (const APath : string) : integer;
     property ObjectCount : integer read GetObjectCount;
     property Objects[Index : integer] : TPortableDeviceObject read GetObject;
     property DeviceObject : TPortableDeviceObject read GetDevObject;
+    property FolderCount : integer read GetFolderCount;
     property RootCount : integer read GetRootCount;
     property RootObjects[Index : integer] : TPortableDeviceObject read GetRootObject;
     end;
@@ -319,7 +331,7 @@ function GetStreamInfoFromIStream (AStream : IStream; var FileData : TFileData) 
 
 implementation
 
-uses System.Win.ComObj, System.DateUtils;
+uses System.Win.ComObj, System.DateUtils, PathUtils, FileUtils;
 
 //-----------------------------------------------------------------------------
 // Raise EOleSysError exception from an error code and show hint
@@ -601,7 +613,7 @@ begin
 function TPortableDeviceObject.GetProperty (const PropertyKey : TPropertyKey; var pv : TPropVariant) : HResult;
 var
   objectProperties : IPortableDeviceValues;
-  properties       : IPortableDeviceProperties;
+  Properties       : IPortableDeviceProperties;
   PropertiesToRead : IPortableDeviceKeyCollection;
 begin
   Result:=FContent.pContent.Properties(properties);
@@ -614,6 +626,21 @@ begin
     PropertiesToRead.Add(PropertyKey);
     Result:=properties.GetValues(PChar(FObjectID),PropertiesToRead,objectProperties);
     if succeeded(Result) then Result:=objectProperties.GetValue(PropertyKey,pv);
+    end;
+  end;
+
+//function TPortableDeviceObject.CanWriteProperty (const PropertyKey : TPropertyKey; var CanWrite : boolean) : HResult;
+function TPortableDeviceObject.CanWriteProperty (ObjectProperty : TObjectProperty) : boolean;
+var
+  Properties  : IPortableDeviceProperties;
+  Attributes  : IPortableDeviceValues;
+  cw          : bool;
+begin
+  Result:=false;
+  if succeeded(FContent.pContent.Properties(Properties)) then begin
+    if succeeded(Properties.GetPropertyAttributes(PChar(FObjectID),ObjectPropertyGuids[ObjectProperty]^,attributes)) then begin
+      if succeeded(Attributes.GetBoolValue(WPD_PROPERTY_ATTRIBUTE_CAN_WRITE,cw)) then Result:=cw;
+      end;
     end;
   end;
 
@@ -840,6 +867,19 @@ begin
     until not assigned(pdo);
   end;
 
+function TPortableDeviceContent.GetFolderCount : integer;
+var
+  nl : integer;
+  pdo : TPortableDeviceObject;
+begin
+  nl:=0; Result:=0;
+  repeat
+    pdo:=FindNextObject(otFolder,nl);
+    inc(nl);
+    if assigned(pdo) then inc(Result);
+    until not assigned(pdo);
+  end;
+
 function TPortableDeviceContent.GetDevObject : TPortableDeviceObject;
 var
   nl : integer;
@@ -897,6 +937,14 @@ begin
     end;
   end;
 
+function TPortableDeviceContent.GetObjectIndexByPath(const APath : string) : integer;
+var
+  pdo : TPortableDeviceObject;
+begin
+  pdo:=GetObjectByPath(APath);
+  if assigned(pdo) then Result:=pdo.Index else Result:=-1;
+  end;
+
 //-----------------------------------------------------------------------------
 constructor TPortableDevice.Create (const AManager : TPortableDeviceManager; const ADeviceID : string);
 begin
@@ -907,7 +955,7 @@ begin
   OleCheck(pDevice.Open(PChar(FDeviceID),FDeviceManager.GetClientInformation),
       'TPortableDevice.Create:IPortableDevice.Open');
   FContent:=TPortableDeviceContent.Create(self);
-  OleCheck(pDevice.Capabilities(pCapabilities),'TPortableDevice.Create:IPortableDevice.Capabilities');;
+  OleCheck(pDevice.Capabilities(pCapabilities),'TPortableDevice.Create:IPortableDevice.Capabilities');
   FDeviceObject:=TPortableDeviceObject.Create(FContent,WPD_DEVICE_OBJECT_ID);
   end;
 

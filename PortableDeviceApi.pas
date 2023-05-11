@@ -1097,7 +1097,7 @@ type
   IPortableDeviceProperties = interface(IUnknown)
     ['{7F6D695C-03DF-4439-A809-59266BEEE3A6}']
     function GetSupportedProperties(pszObjectID: PWideChar; out ppKeys: IPortableDeviceKeyCollection): HResult; stdcall;
-    function GetPropertyAttributes(pszObjectID: PWideChar; var key: TPropertyKey;
+    function GetPropertyAttributes(pszObjectID: PWideChar; const key: TPropertyKey;
                                    out ppAttributes: IPortableDeviceValues): HResult; stdcall;
     function GetValues(pszObjectID: PWideChar; const pKeys: IPortableDeviceKeyCollection;
                        out ppValues: IPortableDeviceValues): HResult; stdcall;

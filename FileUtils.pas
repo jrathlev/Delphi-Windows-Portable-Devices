@@ -20,36 +20,14 @@ unit FileUtils;
 
 interface
 
-uses WinApi.Windows, System.Classes, System.SysUtils, IStreamApi;
+uses WinApi.Windows, System.Classes, System.SysUtils;
 
 type
-{ ------------------------------------------------------------------- }
-  TFileStreamData = record
-    FileStream: IStream;
-    BufferSize: Cardinal;
-    procedure Reset;
-  end;
-
   TFileTimestamps = record
     Valid: boolean;
     CreationTime, LastAccessTime, LastWriteTime: TFileTime;
     procedure Reset;
     procedure SetTimeStamps(CTime, MTime: TDateTime);
-  end;
-
-  TFileData = record
-  private
-    function GetModTime: TDateTime;
-    function GetCreateTime: TDateTime;
-  public
-    FileName,FullPath : string;
-    StreamData: TFileStreamData;
-    FileSize: int64;
-    FileAttr: Cardinal;
-    TimeStamps: TFileTimestamps;
-    procedure Reset;
-    property CreationTime: TDateTime read GetCreateTime;
-    property ModifiedTime: TDateTime read GetModTime;
   end;
 
 { ---------------------------------------------------------------- }
@@ -63,24 +41,16 @@ function FileTimeToLocalDateTime (ft : TFileTime) : TDateTime; overload;
 function SetFileTimestamps (const FileName: string; Timestamps : TFileTimestamps;
                             SetCreationTime : boolean) : integer;
 
+// get file or directory timestamps (UTC) from FindData
+function GetTimestampsFromFindData(const FindData : TWin32FindData) : TFileTimestamps;
+
 // convert Delphi time (TDateTime) to Filetime
 function DateTimeToFileTime (dt : TDateTime) : TFileTime;
 function LocalDateTimeToFileTime (dt : TDateTime) : TFileTime;
 
-{ ---------------------------------------------------------------- }
-// Add a path to a filename
-function AddPath (const Path,Name : string) : string;
-
-// Check if Path is an absolute path (starting with \ or drive)
-function ContainsFullPath (const Path : string) : boolean;
-
-// Extract first subdirectory from path and remove from Path
-function ExtractFirstDir (var Path : string) : string;
-
 implementation
 
-// -----------------------------------------------------------------------------
-// Reset timestamps and file data
+{ ------------------------------------------------------------------- }
 function ResetFileTime : TFileTime;
 begin
   with Result do begin
@@ -88,49 +58,6 @@ begin
     end;
   end;
 
-procedure TFileTimestamps.Reset;
-begin
-  Valid:=false;
-  CreationTime:=ResetFileTime;
-  LastWriteTime:=ResetFileTime;
-  LastAccessTime:=ResetFileTime;
-  end;
-
-procedure TFileTimestamps.SetTimeStamps(CTime, MTime: TDateTime);
-begin
-  Valid:=True;
-  CreationTime:=LocalDateTimeToFileTime(CTime);
-  LastWriteTime:=LocalDateTimeToFileTime(MTime);
-  LastAccessTime:=LastWriteTime;
-  end;
-
-procedure TFileStreamData.Reset;
-begin
-  FileStream:=nil;
-  BufferSize:=0;
-  end;
-
-procedure TFileData.Reset;
-begin
-  FileName:='';
-  FullPath:='';
-  FileSize:=0;
-  FileAttr:=faArchive;
-  TimeStamps.Reset;
-  StreamData.Reset;
-  end;
-
-function TFileData.GetModTime: TDateTime;
-begin
-  Result:=FileTimeToLocalDateTime(TimeStamps.LastWriteTime);
-  end;
-
-function TFileData.GetCreateTime: TDateTime;
-begin
-  Result:=FileTimeToLocalDateTime(TimeStamps.CreationTime);
-  end;
-
-{ ------------------------------------------------------------------- }
 // convert Filetime to Delphi time (TDateTime)
 function FileTimeToDateTime (ft : TFileTime; var dt : TDateTime) : boolean;
 var
@@ -180,6 +107,18 @@ begin
   end;
 
 { ---------------------------------------------------------------- }
+// get file or directory timestamps (UTC) from FindData
+function GetTimestampsFromFindData(const FindData : TWin32FindData) : TFileTimestamps;
+begin
+  with Result do begin
+    CreationTime:=FindData.ftCreationTime;
+    LastAccessTime:=FindData.ftLastAccessTime;
+    LastWriteTime:=FindData.ftLastWriteTime;
+    Valid:=true;
+    end;
+  end;
+
+{ ---------------------------------------------------------------- }
 // set file or directory timestamps (UTC)
 // SetCreationTime = true:  set CreationTime and LastAccessTime
 function SetFileTimestamps (const FileName: string; Timestamps : TFileTimestamps;
@@ -203,39 +142,22 @@ begin
     end;
   end;
 
-{ --------------------------------------------------------------- }
-// Add a path to a filename
-function AddPath (const Path,Name : string) : string;
+// -----------------------------------------------------------------------------
+// Reset timestamps and file data
+procedure TFileTimestamps.Reset;
 begin
-  if length(Name)>0 then begin
-    if length(Path)>0 then Result:=IncludeTrailingPathDelimiter(Path)+Name else Result:=Name;
-    end
-  else Result:=Path;
+  Valid:=false;
+  CreationTime:=ResetFileTime;
+  LastWriteTime:=ResetFileTime;
+  LastAccessTime:=ResetFileTime;
   end;
 
-// Check if Path is an absolute path (starting with \ or drive)
-function ContainsFullPath (const Path : string) : boolean;
+procedure TFileTimestamps.SetTimeStamps(CTime, MTime: TDateTime);
 begin
-  if length(Path)>0 then Result:=(Path[1]=PathDelim) or (pos('.',Path)>0)
-  else Result:=false;
+  Valid:=True;
+  CreationTime:=LocalDateTimeToFileTime(CTime);
+  LastWriteTime:=LocalDateTimeToFileTime(MTime);
+  LastAccessTime:=LastWriteTime;
   end;
-
-// Extract first subdirectory from path and remove from Path
-function ExtractFirstDir (var Path : string) : string;
-var
-  n : integer;
-begin
-  Result:='';
-  if not ContainsFullPath(Path) then begin
-    n:=Pos(PathDelim,Path);
-    if n>0 then begin
-      Result:=copy(Path,1,n-1); delete(Path,1,n);
-      end
-    else begin
-      Result:=Path; Path:='';
-      end;
-    end;
-  end;
-
 
 end.
