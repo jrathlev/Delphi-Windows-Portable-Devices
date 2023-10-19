@@ -1,5 +1,5 @@
 (* Delphi Unit
-  objects and functions to access Windows Portable Devices
+  Objects and functions to access Windows Portable Devices
   ========================================================
 
   © Dr. J. Rathlev, D-24222 Schwentinental (kontakt(a)rathlev-home.de)
@@ -13,6 +13,7 @@
   the specific language governing rights and limitations under the License.
 
   Vers. 1 -  July 2022
+  last modified - October 2023
 *)
 
 unit PortableDeviceUtils;
@@ -27,7 +28,7 @@ const
   CLIENT_NAME         = 'Delphi PortableDeviceUtils';
   CLIENT_MAJOR_VER    = 1;
   CLIENT_MINOR_VER    = 0;
-  CLIENT_REVISION     = 0;
+  CLIENT_REVISION     = 2;
 
   PowerSources : array of string = ['Battery','External'];
   DeviceTypes : array of string = ['Generic','Camera','Media Player','Phone',
@@ -50,7 +51,7 @@ type
 
   TObjectFormat = (ofUnknown, ofScript, ofExecutable, ofText, ofHtml, ofDigPrintOrder,
     ofAudioInterchange, ofWave, ofMp3, ofAvi, ofMpeg, ofAdvStream, ofExif, ofTiffEp,
-    ofFlashOix, ofBmp, ofCamImg, ofGif, ofJpgInterchange, ofPtCloudData, ofPict, ofPng,
+    ofFlashPix, ofBmp, ofCamImg, ofGif, ofJpgInterchange, ofPtCloudData, ofPict, ofPng,
     ofTiff, ofTiffIt, ofJp2, ofJpX, ofWinImg, ofWma, ofWmv, ofWplPlaylist, ofM3uPlaylist,
     ofMplPlaylist, ofAsxPlaylist, ofPlsPlaylist, ofAbstractContactGroup, ofAbstractMediaCast,
     ofVCalendar, ofICalendar, ofAbstractContact, ofVCard2, ofVCard3, ofIcon, ofXml,
@@ -163,6 +164,14 @@ const
 
   otDefault = [otDevice,otRoot,otFolder,otFile];
 
+  ObjectExtensions : array [TObjectFormat] of string = ('','txt','','txt','html','dpof',
+    'aiff','wav','mp3','avi','mpeg','asf','jpg','tiffep',
+    'flashpix','bmp','ciff','gif','jfif','pcd','pict','png',
+    'tiff','tiffit','jp2','jpx','wim','wma','wmv','wpl','m3u',
+    'mpl','asx','pls','','','vcs','ics','','vcf','vcf','ico','xml',
+    'aac','aax','flac','ogg','mp4','m4a','mp2','doc',
+    'chm','xls','pps','','x509','wfc','3gp','gpa','');
+
 type
   TPCharArray = array of PWideChar;
 
@@ -170,6 +179,11 @@ type
   TPortableDeviceManager = class;
   TPortableDevice = class;
   TPortableDeviceContent = class;
+
+  TDeviceError = record
+    ErrorCode : integer;
+    ErrorId   : string;
+    end;
 
   TDeviceData = class (TObject)
   private
@@ -183,6 +197,7 @@ type
     FObjectID,FParentID,
     FObjectName : string;
     FContentType : TGuid;
+    FObjectFormat : TGuid;
     FContent : TPortableDeviceContent;
     FChildObjects : array of integer;
     FChildCount,
@@ -191,10 +206,13 @@ type
     FLevel : integer;
     function GetChildCount : integer;
     function GetChild (Index : integer) : TPortableDeviceObject;
-    function GetObjectName : string;
     function GetParentID : string;
     function GetContentType : TGuid;
+    function GetObjectName : string;
+    function GetDisplayName : string;
     function GetObjecType : TObjectType;
+    function GetObjectFormat : TObjectFormat;
+    function GetObjectExt : string;
     function GetCreationTime: TDateTime;
     function GetLastWriteTime: TDateTime;
     function GetSize: int64;
@@ -213,10 +231,14 @@ type
 //    property ChildObjectCount : integer read FChildObjectCount;
     function GetProperty (const PropertyKey : TPropertyKey; var pv : TPropVariant) : HResult;
     function CanWriteProperty (ObjectProperty : TObjectProperty) : boolean;
+    function AddNameExtension (const AFilename : string) : string;
     property ContentType : TGuid read GetContentType;
     property Index : integer read FIndex;
     property Level : integer read FLevel;
     property ObjectName : string read GetObjectName;
+    property DisplayName : string read GetDisplayName;
+    property ObjectExtension : string read GetObjectExt;
+    property ObjectFormat : TObjectFormat read GetObjectFormat;
     property ObjectType : TObjectType read GetObjecType;
     property ObjectID : string read FObjectID;
     property Path : string read GetPath;
@@ -235,7 +257,8 @@ type
     FDevice  : TPortableDevice;
     FObjectList : TStringlist;
     FFindCallback : TFindObjects;
-    procedure FindObjects (const AObjectID : string; AParent : TPortableDeviceObject);
+    FLastError : TDeviceError;
+    function FindObjects (const AObjectID : string; AParent : TPortableDeviceObject) : boolean;
     function GetObjectCount : integer;
     function GetRootCount : integer;
     function GetFolderCount : integer;
@@ -245,11 +268,12 @@ type
   public
     constructor Create (const ADevice : TPortableDevice);
     destructor Destroy; override;
-    procedure Refresh (ACallBack : TFindObjects = nil);
+    function Refresh (ACallBack : TFindObjects = nil) : boolean;
     function FindNextObject (AObjectType : TObjectType; var AIndex : integer) : TPortableDeviceObject;
     function GetObjectByID (const AObjectID : string) : TPortableDeviceObject;
     function GetObjectByPath (APath : string) : TPortableDeviceObject;
     function GetObjectIndexByPath (const APath : string) : integer;
+    property LastError : TDeviceError read FLastError;
     property ObjectCount : integer read GetObjectCount;
     property Objects[Index : integer] : TPortableDeviceObject read GetObject;
     property DeviceObject : TPortableDeviceObject read GetDevObject;
@@ -331,7 +355,27 @@ function GetStreamInfoFromIStream (AStream : IStream; var FileData : TFileData) 
 
 implementation
 
-uses System.Win.ComObj, System.DateUtils, PathUtils, FileUtils;
+uses System.Win.ComObj, System.DateUtils, FileUtils;
+
+//-----------------------------------------------------------------------------
+// Extract first subdirectory from path and remove from Path
+function ExtractFirstDir (var Path : string) : string;
+var
+  n : integer;
+begin
+  Result:='';
+  if length(Path)>0 then begin
+    if (Path[1]<>PathDelim) and (pos(DriveDelim,Path)=0) then begin
+      n:=Pos(PathDelim,Path);
+      if n>0 then begin
+        Result:=copy(Path,1,n-1); delete(Path,1,n);
+        end
+      else begin
+        Result:=Path; Path:='';
+        end;
+      end;
+    end;
+  end;
 
 //-----------------------------------------------------------------------------
 // Raise EOleSysError exception from an error code and show hint
@@ -339,8 +383,9 @@ procedure OleErrorHint(ErrorCode : HResult; const Hint : string = '');
 var se : string;
 begin
   se:=SysErrorMessage(ErrorCode);
-  if length(se)=0 then se:='<Unknown error code>';
-  raise EOleSysError.Create(Hint+' ('+se+')',ErrorCode,0);
+  if length(se)=0 then se:='<Unknown error code>'
+  else se:=se+Format(' (0x%.8x)',[ErrorCode]);
+  raise EOleSysError.Create(Hint+' : '+se,ErrorCode,0);
   end;
 
 // Raise EOleSysError exception if result code indicates an error }
@@ -480,7 +525,7 @@ var
 begin
   with FileData do begin
     FileName:=''; FileSize:=0; FileAttr:=INVALID_FILE_ATTRIBUTES;
-    FillChar(TimeStamps,sizeof(TFileTimestamps),0);
+    TimeStamps.Reset;
     end;
   Result:=AStream.Stat(ssg,STATFLAG_NONAME);
   if succeeded(Result) and (ssg.dwType=STGTY_STREAM) then with FileData do begin
@@ -528,6 +573,15 @@ begin
   end;
 
 //-----------------------------------------------------------------------------
+function GetFormatTypeFromGuid (const formatType : TGuid) : TObjectFormat;
+var
+  i : integer;
+begin
+  for i:=0 to High(ObjectFormatGuids) do if ObjectFormatGuids[i]^=formatType then Break;
+  if i<length(ObjectFormatGuids) then Result:=TObjectFormat(i) else Result:=ofUnknown;
+  end;
+
+//-----------------------------------------------------------------------------
 constructor TDeviceData.Create (const AName : string);
 begin
   inherited Create;
@@ -542,7 +596,7 @@ begin
   FContent:=AContent; FObjectID:=AObjectID; FParentIndex:=AParentIndex; FLevel:=ALevel;
   FParentID:=''; FObjectName:='';
   FChildCount:=-1; FChildObjects:=nil;
-  FContentType:=GUID_NULL;
+  FContentType:=GUID_NULL; FObjectFormat:=GUID_NULL;
   end;
 
 destructor TPortableDeviceObject.Destroy;
@@ -617,7 +671,7 @@ var
   PropertiesToRead : IPortableDeviceKeyCollection;
 begin
   Result:=FContent.pContent.Properties(properties);
-  // CoCreate an IPortableDeviceKeyCollection interface to hold the the property keys
+  // CoCreate an IPortableDeviceKeyCollection interface to hold the property keys
   if succeeded(Result) then
     Result:=CoCreateInstance(CLSID_PortableDeviceKeyCollection,nil,CLSCTX_INPROC_SERVER,
              IPortableDeviceKeyCollection,PropertiesToRead);
@@ -626,6 +680,7 @@ begin
     PropertiesToRead.Add(PropertyKey);
     Result:=properties.GetValues(PChar(FObjectID),PropertiesToRead,objectProperties);
     if succeeded(Result) then Result:=objectProperties.GetValue(PropertyKey,pv);
+// 'Die angeforderte Ressource wird bereits verwendet (0x800700AA)'
     end;
   end;
 
@@ -765,6 +820,44 @@ begin
   else Result:=otUnknown;
   end;
 
+function TPortableDeviceObject.GetObjectFormat : TObjectFormat;
+var
+  pv : TPropVariant;
+begin
+  if FObjectFormat=GUID_NULL then begin
+    if succeeded(GetProperty(WPD_OBJECT_FORMAT,pv)) then begin
+      with pv do if vt=VT_CLSID then FObjectFormat:=puuid^ else FObjectFormat:=WPD_OBJECT_FORMAT_UNSPECIFIED;
+      end
+    else FObjectFormat:=WPD_OBJECT_FORMAT_UNSPECIFIED;
+    PropVariantClear(pv);
+    end;
+  Result:=GetFormatTypeFromGuid(FObjectFormat);
+  end;
+
+function TPortableDeviceObject.GetObjectExt : string;
+begin
+  Result:=ObjectExtensions[ObjectFormat];
+  end;
+
+function TPortableDeviceObject.AddNameExtension (const AFilename : string) : string;
+var
+  sf,se : string;
+begin
+  Result:=AFilename;
+  sf:=GetObjectExt;
+  if length(sf)>0 then begin
+    se:=ExtractFileExt(AFilename);
+    if (length(se)=0) then Result:=AFilename+'.'+sf;
+    end
+  end;
+
+function TPortableDeviceObject.GetDisplayName : string;
+begin
+  Result:=ObjectName;
+  if length(Result)=0 then Result:=ObjectID;
+  Result:=AddNameExtension(Result);
+  end;
+
 function TPortableDeviceObject.GetPath : string;
 var
   ID : string;
@@ -787,6 +880,9 @@ begin
   FDevice:=ADevice; FFindCallback:=nil;
   OleCheck(FDevice.pDevice.Content(pContent),'TPortableDeviceContent.Create:IPortableDevice.Content(');
   FObjectList:=TStringlist.Create;
+  with FLastError do begin
+    ErrorCode:=S_OK; ErrorId:='';
+    end;
   end;
 
 destructor TPortableDeviceContent.Destroy;
@@ -796,7 +892,7 @@ begin
   inherited Destroy;
   end;
 
-procedure TPortableDeviceContent.FindObjects (const AObjectID : string; AParent : TPortableDeviceObject);
+function TPortableDeviceContent.FindObjects (const AObjectID : string; AParent : TPortableDeviceObject) : boolean;
 var
   hr            : HResult;
   enumObjectIDs : IEnumPortableDeviceObjectIDs;
@@ -819,26 +915,32 @@ begin
   pdo.SetIndex(n);
   if assigned(AParent) then AParent.AddChild(n);
   hr:=pContent.EnumObjects(0,PWideChar(AObjectID),nil,enumObjectIDs);
-  OleCheck(hr,'TPortableDeviceContent.FindObjects:IPortableDeviceContent.EnumObjects');
-  while (hr=S_OK) do begin
+  Result:=succeeded(hr);
+  if Result then begin
+//  OleCheck(hr,'TPortableDeviceContent.FindObjects:IPortableDeviceContent.EnumObjects (ID='+AObjectID+')');
     SetLength(objectIDArray,NumObjects);
-    hr:=enumObjectIDs.Next(NumObjects,objectIDArray[0],numFetched);
-    if succeeded(hr) then begin
-      if numFetched>0 then for i:=0 to numFetched-1 do if objectIDArray[i]<>nil then begin
-        FindObjects(objectIDArray[i],pdo); // inc(nc);
-        CoTaskMemFree(objectIDArray[i]); objectIDArray[i]:=nil;
+    while hr=S_OK do begin
+      hr:=enumObjectIDs.Next(NumObjects,objectIDArray[0],numFetched);
+      if succeeded(hr) then begin
+        if numFetched>0 then for i:=0 to numFetched-1 do if objectIDArray[i]<>nil then begin
+          Result:=FindObjects(objectIDArray[i],pdo) and Result;
+          CoTaskMemFree(objectIDArray[i]); objectIDArray[i]:=nil;
+          end;
         end;
       end;
     objectIDArray:=nil;
+    end
+  else with FLastError do begin
+    ErrorCode:=hr; ErrorId:=AObjectID;
     end;
-  OleCheck(hr,'TPortableDeviceContent.FindObjects:IPortableDeviceContent.Next');
+//  OleCheck(hr,'TPortableDeviceContent.FindObjects:IPortableDeviceContent.Next');
   end;
 
-procedure TPortableDeviceContent.Refresh (ACallBack : TFindObjects);
+function TPortableDeviceContent.Refresh (ACallBack : TFindObjects) : boolean;
 begin
   FreeListObjects(FObjectList); FObjectList.Clear;
   FFindCallback:=ACallBack;
-  FindObjects(WPD_DEVICE_OBJECT_ID,nil);
+  Result:=FindObjects(WPD_DEVICE_OBJECT_ID,nil);
   FFindCallback:=nil;
   end;
 
@@ -1151,29 +1253,35 @@ var
     fnl  : DWORD;
     sBuf : array of WChar;
     pnul : PWChar;
+    hr   : HResult;
   begin
     fnl:=0; Result:=''; pnul:=nil;
-    OleCheck(pDeviceManager.GetDeviceFriendlyName(pchar(DeviceID),pnul^,fnl),
-      'TPortableDevice.GetDeviceName:IDeviceManager.GetDeviceFriendlyName');
-    if fnl>0 then begin
-      SetLength(sBuf,fnl);
-      OleCheck(pDeviceManager.GetDeviceFriendlyName(pchar(DeviceID),sbuf[0],fnl),
-        'TPortableDevice.GetDeviceName:IDeviceManager.GetDeviceFriendlyName');
-      Result:=pchar(@sbuf[0]);
-      sBuf:=nil;
-      end
+    hr:=pDeviceManager.GetDeviceFriendlyName(pchar(DeviceID),pnul^,fnl);
+//    OleCheck(pDeviceManager.GetDeviceFriendlyName(pchar(DeviceID),pnul^,fnl),
+//      'TPortableDevice.GetDeviceName:IDeviceManager.GetDeviceFriendlyName');
+    if succeeded(hr) then begin
+      if fnl>0 then begin
+        SetLength(sBuf,fnl);
+        hr:=pDeviceManager.GetDeviceFriendlyName(pchar(DeviceID),sbuf[0],fnl);
+  //      OleCheck(pDeviceManager.GetDeviceFriendlyName(pchar(DeviceID),sbuf[0],fnl),
+  //        'TPortableDevice.GetDeviceName:IDeviceManager.GetDeviceFriendlyName');
+        if succeeded(hr) then Result:=pchar(@sbuf[0]);
+        sBuf:=nil;
+        end;
+      end;
+    if failed(hr) then Result:='<Unknown device>';
     end;
 
 begin
   OleCheck(CoCreateInstance(CLSID_PortableDeviceManager,nil,CLSCTX_INPROC_SERVER,IID_IPortableDeviceManager,pDeviceManager),
-          'TPortableDeviceManager.Refresh:CoCreateInstance CLSID_PortableDeviceManager');
+          'TPortableDeviceManager.Refresh: CoCreateInstance CLSID_PortableDeviceManager');
   // Pass nullptr as the PWSTR array pointer to get the total number of devices found on the system.
   pnul:=nil; FDeviceCount:=0;
   OleCheck(pDeviceManager.GetDevices(pnul^,FDeviceCount),
-    'TPortableDeviceManager.Refresh:IDeviceManager.GetDevices');
+    'TPortableDeviceManager.Refresh:IDeviceManager.GetDevices: DeviceCount');
   SetLength(DeviceIDs,FDeviceCount);
   OleCheck(pDeviceManager.GetDevices(DeviceIDs[0],FDeviceCount),
-    'TPortableDeviceManager.Refresh:IDeviceManager.GetDevices');
+    'TPortableDeviceManager.Refresh:IDeviceManager.GetDevices: DeviceIDs');
   // Loop through all devices
   FDeviceList.Clear;
   if FDeviceCount>0 then for i:=0 to FDeviceCount-1 do begin
@@ -1214,3 +1322,4 @@ begin
   end;
 
 end.
+

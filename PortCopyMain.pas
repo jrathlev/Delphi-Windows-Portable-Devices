@@ -214,7 +214,7 @@ begin
       pdo:=Children[i];
       if assigned(pdo) and (pdo.ObjectType=otFile) then begin
         with lvFiles.Items.Add do with pdo do begin
-          Caption:=ObjectName;
+          Caption:=DisplayName;
           if length(Caption)=0 then Caption:=ExtractFilename(ObjectID);
           SubItems.Add(DateTimeToStr(LastWriteTime));
           SubItems.Add(SizeToStr(Size));

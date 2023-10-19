@@ -130,7 +130,6 @@ object MainForm: TMainForm
     Caption = 'Reload devices'
     TabOrder = 2
     OnClick = btnUpdateClick
-    ExplicitTop = 275
   end
   object tvObjects: TTreeView
     Left = 260
@@ -143,7 +142,6 @@ object MainForm: TMainForm
     TabOrder = 3
     OnClick = tvObjectsClick
     OnExpanding = tvObjectsExpanding
-    ExplicitHeight = 241
   end
   object lvFiles: TListView
     Left = 490
@@ -169,7 +167,6 @@ object MainForm: TMainForm
     TabOrder = 4
     ViewStyle = vsReport
     OnClick = lvFilesClick
-    ExplicitHeight = 241
   end
   object btnCopy: TButton
     Left = 770
@@ -180,7 +177,6 @@ object MainForm: TMainForm
     Caption = 'Copy files'
     TabOrder = 5
     OnClick = btnCopyClick
-    ExplicitTop = 275
   end
   object paCopy: TPanel
     Left = 265
@@ -190,7 +186,6 @@ object MainForm: TMainForm
     Anchors = [akLeft, akRight, akBottom]
     BevelOuter = bvNone
     TabOrder = 6
-    ExplicitTop = 275
     object laPath: TLabel
       Left = 10
       Top = 20
@@ -215,7 +210,6 @@ object MainForm: TMainForm
     Caption = 'Show directories'
     TabOrder = 7
     OnClick = lbDevicesClick
-    ExplicitTop = 275
   end
   object FolderDialog: TFileOpenDialog
     DefaultFolder = 'E:\Test'
