@@ -195,7 +195,8 @@ type
   TPortableDeviceObject = class (TObject)
   private
     FObjectID,FParentID,
-    FObjectName : string;
+    FObjectName,
+    FOriginalName : string;
     FContentType : TGuid;
     FObjectFormat : TGuid;
     FContent : TPortableDeviceContent;
@@ -209,6 +210,7 @@ type
     function GetParentID : string;
     function GetContentType : TGuid;
     function GetObjectName : string;
+    function GetOriginalName : string;
     function GetDisplayName : string;
     function GetObjecType : TObjectType;
     function GetObjectFormat : TObjectFormat;
@@ -228,6 +230,7 @@ type
     function GetFileStream (var AStreamData : TFileStreamData) : HResult;
     procedure AddChild (AIndex : integer);
     function GetChildByName (const AName : string) : TPortableDeviceObject;
+    function GetChildByOriginalName (const AName : string) : TPortableDeviceObject;
 //    property ChildObjectCount : integer read FChildObjectCount;
     function GetProperty (const PropertyKey : TPropertyKey; var pv : TPropVariant) : HResult;
     function CanWriteProperty (ObjectProperty : TObjectProperty) : boolean;
@@ -236,6 +239,7 @@ type
     property Index : integer read FIndex;
     property Level : integer read FLevel;
     property ObjectName : string read GetObjectName;
+    property OriginalName : string read GetOriginalName;
     property DisplayName : string read GetDisplayName;
     property ObjectExtension : string read GetObjectExt;
     property ObjectFormat : TObjectFormat read GetObjectFormat;
@@ -594,7 +598,7 @@ constructor TPortableDeviceObject.Create (const AContent : TPortableDeviceConten
 begin
   inherited Create;
   FContent:=AContent; FObjectID:=AObjectID; FParentIndex:=AParentIndex; FLevel:=ALevel;
-  FParentID:=''; FObjectName:='';
+  FParentID:=''; FObjectName:=''; FOriginalName:='';
   FChildCount:=-1; FChildObjects:=nil;
   FContentType:=GUID_NULL; FObjectFormat:=GUID_NULL;
   end;
@@ -613,7 +617,7 @@ begin
   Result:=FContent.pContent.Transfer(Resources);
   if succeeded(Result) then begin
     with AFileData do begin
-      Filename:=ObjectName;
+      Filename:=DisplayName;
       FileSize:=Size;
       TimeStamps.SetTimeStamps(CreationTime,LastWriteTime);
       if ObjectType=otFile then begin
@@ -731,6 +735,14 @@ begin
   if i<ChildCount then Result:=Children[i] else Result:=nil;
   end;
 
+function TPortableDeviceObject.GetChildByOriginalName (const AName : string) : TPortableDeviceObject;
+var
+  i : integer;
+begin
+  for i:=0 to ChildCount-1 do if AnsiSameText(Children[i].OriginalName,AName) then Break;
+  if i<ChildCount then Result:=Children[i] else Result:=nil;
+  end;
+
 function TPortableDeviceObject.GetObjectName : string;
 var
   pv : TPropVariant;
@@ -740,10 +752,25 @@ begin
       with pv do if vt=VT_LPWSTR then Result:=pwszVal else Result:='';
       FObjectName:=Result;
       end
-    else Result:=FObjectID;
+    else Result:='';
     PropVariantClear(pv);
     end
   else Result:=FObjectName;
+  end;
+
+function TPortableDeviceObject.GetOriginalName : string;
+var
+  pv : TPropVariant;
+begin
+  if length(FOriginalName)=0 then begin
+    if succeeded(GetProperty(WPD_OBJECT_ORIGINAL_FILE_NAME,pv)) then begin
+      with pv do if vt=VT_LPWSTR then Result:=pwszVal else Result:='';
+      FOriginalName:=Result;
+      end
+    else Result:='';
+    PropVariantClear(pv);
+    end
+  else Result:=FOriginalName;
   end;
 
 function TPortableDeviceObject.GetParentID : string;
@@ -853,9 +880,16 @@ begin
 
 function TPortableDeviceObject.GetDisplayName : string;
 begin
-  Result:=ObjectName;
-  if length(Result)=0 then Result:=ObjectID;
-  Result:=AddNameExtension(Result);
+  if ObjectType=otFile then begin
+    Result:=OriginalName;
+    if length(Result)=0 then Result:=ObjectName;   // use ObjectName if WPD_OBJECT_ORIGINAL_FILE_NAME property is missing
+    if length(Result)=0 then Result:=ObjectID+'.data'; // if both properties are missing
+    end
+  else begin
+    Result:=ObjectName;
+    if length(Result)=0 then Result:=OriginalName; // use OriginalName if WPD_OBJECT_NAME property is missing
+    if length(Result)=0 then Result:=ObjectID;     // if both properties are missing
+    end;
   end;
 
 function TPortableDeviceObject.GetPath : string;
@@ -863,11 +897,11 @@ var
   ID : string;
   obj : TPortableDeviceObject;
 begin
-  Result:=FObjectName; ID:=ParentID;
+  Result:=DisplayName; ID:=ParentID;
   while (length(ID)>0) and not AnsiSameText(ID,WPD_DEVICE_OBJECT_ID) do begin
     obj:=FContent.GetObjectByID(ID);
     if assigned(obj) then with obj do begin
-      Result:=IncludeTrailingPathDelimiter(ObjectName)+Result;
+      Result:=IncludeTrailingPathDelimiter(DisplayName)+Result;
       ID:=ParentID;
       end;
     end;
@@ -1026,7 +1060,7 @@ var
 begin
   Result:=nil;
   s:=ExtractFirstDir(APath);
-  for i:=0 to RootCount-1 do if AnsiSameText(RootObjects[i].ObjectName,s) then Break;
+  for i:=0 to RootCount-1 do if AnsiSameText(RootObjects[i].DisplayName,s) then Break;
   if (i<RootCount) then begin
     pdo:=RootObjects[i];
     if length(APath)>0 then begin

@@ -13,7 +13,7 @@
    the specific language governing rights and limitations under the License.
 
    J. Rathlev, June 2022
-   last modified: May 2023
+   last modified: October 2023
    *)
 
 unit PortCopyMain;
@@ -205,6 +205,7 @@ var
   i : integer;
   pdo : TPortableDeviceObject;
 begin
+  Screen.Cursor:=crHourGlass;
   with lvFiles.Items do begin
     Clear;
     BeginUpdate;
@@ -214,7 +215,7 @@ begin
       pdo:=Children[i];
       if assigned(pdo) and (pdo.ObjectType=otFile) then begin
         with lvFiles.Items.Add do with pdo do begin
-          Caption:=DisplayName;
+          Caption:=OriginalName;
           if length(Caption)=0 then Caption:=ExtractFilename(ObjectID);
           SubItems.Add(DateTimeToStr(LastWriteTime));
           SubItems.Add(SizeToStr(Size));
@@ -224,6 +225,7 @@ begin
       end;
     end;
   lvFiles.Items.EndUpdate;
+  Screen.Cursor:=crDefault;
   end;
 
 procedure TMainForm.AddTreeLevel (node : TTreeNode; AParent : TPortableDeviceObject);
@@ -236,8 +238,7 @@ begin
   with AParent do for i:=0 to ChildCount-1 do begin
     pdo:=Children[i];
     if assigned(pdo) and (pdo.ObjectType in [otRoot,otFolder]) then begin
-      sn:=pdo.ObjectName;
-      if length(sn)=0 then sn:=ExtractFilename(pdo.ObjectID);
+      sn:=pdo.DisplayName;
       nc:=tvObjects.Items.AddChild(node,sn);
       nc.Data:=pointer(pdo.Index);
       tvObjects.Items.AddChild(nc,'');
@@ -268,8 +269,7 @@ begin
     Refresh(RefreshStatus);
     pdo:=DeviceObject;
     if assigned(pdo) then begin
-      sn:=pdo.ObjectName;
-      if length(sn)=0 then sn:=Device.DeviceName;
+      sn:=pdo.DisplayName;
       node:=tvObjects.Items.Add(nil,sn);
       AddTreeLevel(node,pdo);
       node.Expand(false);
@@ -385,8 +385,8 @@ begin
       n:=integer(Data);
       PDObject:=Device.Content.Objects[n];
       with PDObject do begin
-        with laPath do Caption:=MinimizeName(ObjectName,Canvas,paCopy.Width-2*Left);
-        sd:=IncludeTrailingPathDelimiter(Dest)+ExtractFilename(ObjectName);
+        with laPath do Caption:=MinimizeName(OriginalName,Canvas,paCopy.Width-2*Left);
+        sd:=IncludeTrailingPathDelimiter(Dest)+ExtractFilename(OriginalName);
         GetFileData(FileData,true);
         end;
       try

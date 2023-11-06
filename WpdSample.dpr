@@ -24,7 +24,8 @@
    the specific language governing rights and limitations under the License.
 
    Vers. 1 - May 2022
-   last modified:  December 2022
+           - November 2023 added: WPD_OBJECT_ORIGINAL_FILE_NAME
+   last modified:  November 2023
    *)
 
 program WpdSample;
@@ -753,12 +754,33 @@ begin
   // Free the allocated string returned from the
   // GetStringValue method
     end
+  else if length(keyname)=0 then Result:='<Not Found>'
   else Result:=Format('%s: <Not Found>',[keyname]);
   CoTaskMemFree(value); value:=nil;
   end;
 
+function GetProperty (properties : IPortableDeviceValues; key : TPropertyKey; var PropStr : string) : boolean;
+var
+  hr  : HResult;
+  value : PWideChar;
+begin
+  Result:=false;
+  hr:=properties.GetStringValue(key,value);
+  if succeeded(hr) then begin
+    // Get the length of the string value so we
+    // can output <empty string value> if one is encountered.
+    if length(value)>0 then PropStr:=value
+    else PropStr:='<empty string value>';
+    Result:=true;
+    end
+  else PropStr:='';
+  // Free the allocated string returned from the
+  // GetStringValue method
+  CoTaskMemFree(value); value:=nil;
+  end;
+
 // Get a property assumed to be in GUID form - refer to "DisplayGuidProperty"
-function GuidPropertyAsString  (properties : IPortableDeviceValues; key : TPropertyKey; const keyname : string) : string;
+function GuidPropertyAsString (properties : IPortableDeviceValues; key : TPropertyKey; const keyname : string) : string;
 var
   hr  : HResult;
   value : TGuid;
@@ -802,6 +824,7 @@ begin
         writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_PARENT_ID,'WPD_OBJECT_PARENT_ID'));
         writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_ID,'WPD_OBJECT_ID'));
         writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_NAME,'WPD_OBJECT_NAME'));
+        writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_ORIGINAL_FILE_NAME,'WPD_OBJECT_ORIGINAL_FILE_NAME'));
         writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_PERSISTENT_UNIQUE_ID,'WPD_OBJECT_PERSISTENT_UNIQUE_ID'));
         writeln(GuidPropertyAsString (objectProperties,WPD_OBJECT_CONTENT_TYPE,'WPD_OBJECT_CONTENT_TYPE'));
         writeln(GuidPropertyAsString (objectProperties,WPD_OBJECT_FORMAT,'WPD_OBJECT_FORMAT'));
@@ -868,6 +891,8 @@ begin
       if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_ID to IPortableDeviceKeyCollection',thr);
       thr:=PropertiesToRead.Add(WPD_OBJECT_NAME);
       if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_NAME to IPortableDeviceKeyCollection',thr);
+      thr:=propertiesToRead.Add(WPD_OBJECT_ORIGINAL_FILE_NAME);
+      if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_ORIGINAL_FILE_NAME to IPortableDeviceKeyCollection',thr);
       thr:=PropertiesToRead.Add(WPD_OBJECT_PERSISTENT_UNIQUE_ID);
       if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_PERSISTENT_UNIQUE_ID to IPortableDeviceKeyCollection',thr);
       thr:=PropertiesToRead.Add(WPD_OBJECT_FORMAT);
@@ -1096,6 +1121,8 @@ begin
         if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_PARENT_ID to IPortableDeviceKeyCollection',thr);
         thr:=PropertiesToRead.Add(WPD_OBJECT_NAME);
         if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_NAME to IPortableDeviceKeyCollection',thr);
+        thr:=propertiesToRead.Add(WPD_OBJECT_ORIGINAL_FILE_NAME);
+        if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_ORIGINAL_FILE_NAME to IPortableDeviceKeyCollection',thr);
         thr:=PropertiesToRead.Add(WPD_OBJECT_PERSISTENT_UNIQUE_ID);
         if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_PERSISTENT_UNIQUE_ID to IPortableDeviceKeyCollection',thr);
         thr:=PropertiesToRead.Add(WPD_OBJECT_FORMAT);
@@ -1236,12 +1263,17 @@ begin
   if succeeded(hr) then begin
     // Populate the IPortableDeviceKeyCollection with WPD_OBJECT_NAME.
     PropertiesToRead.Add(WPD_OBJECT_NAME);
-    PropertiesToRead.Add(WPD_OBJECT_FORMAT);
+    PropertiesToRead.Add(WPD_OBJECT_ORIGINAL_FILE_NAME);
     hr:=properties.GetValues(PChar(objectID),  // The object whose properties we are reading
                       PropertiesToRead,        // The properties we want to read
                       objectProperties);       // Driver supplied property values for the specified object
     if failed(hr) then Result:=ErrorMsg(Format('Failed to get properties for object "%s"',[objectID]),hr)
-    else Result:=StringPropertyAsString(objectProperties,WPD_OBJECT_NAME,'');
+    else begin
+      if not GetProperty(objectProperties,WPD_OBJECT_NAME,Result) then begin
+        if not GetProperty(objectProperties,WPD_OBJECT_ORIGINAL_FILE_NAME,Result) then Result:='<Not Found>';
+        Result:=Format('%s: %s',['<No Object Name> - Original name',Result]);
+        end;
+      end;
     end;
   end;
 
@@ -2201,6 +2233,8 @@ begin
       if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_ID to IPortableDeviceKeyCollection',thr);
       thr:=propertiesToRead.Add(WPD_OBJECT_NAME);
       if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_NAME to IPortableDeviceKeyCollection',thr);
+      thr:=propertiesToRead.Add(WPD_OBJECT_ORIGINAL_FILE_NAME);
+      if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_ORIGINAL_FILE_NAME to IPortableDeviceKeyCollection',thr);
       thr:=propertiesToRead.Add(WPD_OBJECT_PERSISTENT_UNIQUE_ID);
       if failed(thr) then WriteErrMsg ('Failed to add WPD_OBJECT_PERSISTENT_UNIQUE_ID to IPortableDeviceKeyCollection',thr);
       thr:=propertiesToRead.Add(WPD_OBJECT_FORMAT);
@@ -2220,6 +2254,7 @@ begin
       writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_PARENT_ID,'WPD_OBJECT_PARENT_ID'));
       writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_ID,'WPD_OBJECT_ID'));
       writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_NAME,'WPD_OBJECT_NAME'));
+      writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_ORIGINAL_FILE_NAME,'WPD_OBJECT_ORIGINAL_FILE_NAME'));
       writeln(StringPropertyAsString(objectProperties,WPD_OBJECT_PERSISTENT_UNIQUE_ID,'WPD_OBJECT_PERSISTENT_UNIQUE_ID'));
       writeln(GuidPropertyAsString (objectProperties,WPD_OBJECT_CONTENT_TYPE,'WPD_OBJECT_CONTENT_TYPE'));
       writeln(GuidPropertyAsString (objectProperties,WPD_OBJECT_FORMAT,'WPD_OBJECT_FORMAT'));
