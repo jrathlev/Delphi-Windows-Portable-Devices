@@ -28,7 +28,7 @@ const
   CLIENT_NAME         = 'Delphi PortableDeviceUtils';
   CLIENT_MAJOR_VER    = 1;
   CLIENT_MINOR_VER    = 0;
-  CLIENT_REVISION     = 2;
+  CLIENT_REVISION     = 3;
 
   PowerSources : array of string = ['Battery','External'];
   DeviceTypes : array of string = ['Generic','Camera','Media Player','Phone',
