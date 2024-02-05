@@ -13,7 +13,7 @@
    the specific language governing rights and limitations under the License.
 
    J. Rathlev, June 2022
-   last modified: October 2023
+   last modified: February 2024
    *)
 
 unit PortCopyMain;
@@ -146,6 +146,13 @@ begin
     end;
   end;
 
+function SystemErrorMessage(ASysError : cardinal) : string;
+begin
+  Result:=SysErrorMessage(ASysError);
+  if length(Result)>0 then Result:=Result+Format(' (0x%.8x)',[ASysError])
+  else Result:=Format(' 0x%.8x',[ASysError]);
+  end;
+
 { ---------------------------------------------------------------- }
 procedure TMainForm.FormCreate(Sender: TObject);
 begin
@@ -267,6 +274,11 @@ begin
     end;
   with Device.Content do begin
     Refresh(RefreshStatus);
+    with ErrorObjects do if Count>0 then begin
+      sn:=Format('Error on object "%s": %s',[Strings[0],SystemErrorMessage(ErrorCode[0])]);
+      if Count>1 then sn:=sn+sLineBreak+Format('... &u more errors',[Count-1]);
+      MessageDlg(sn,mtError,[mbClose],0);
+      end;
     pdo:=DeviceObject;
     if assigned(pdo) then begin
       sn:=pdo.DisplayName;
@@ -368,7 +380,7 @@ begin
   try sDest.Free; except; end;
   ec:=SetFileTimestamps(ADestName,ASource.TimeStamps,false);
   if ec<>NO_ERROR then
-     raise EWriteError.Create(SysErrorMessage(ec));
+     raise EWriteError.Create(SystemErrorMessage(ec));
   end;
 
 procedure TMainForm.btnCopyClick(Sender: TObject);
