@@ -13,7 +13,7 @@
   the specific language governing rights and limitations under the License.
 
   Vers. 1 -  July 2022
-  last modified - October 2023
+  last modified - January 2024
 *)
 
 unit PortableDeviceUtils;
@@ -28,7 +28,7 @@ const
   CLIENT_NAME         = 'Delphi PortableDeviceUtils';
   CLIENT_MAJOR_VER    = 1;
   CLIENT_MINOR_VER    = 0;
-  CLIENT_REVISION     = 3;
+  CLIENT_REVISION     = 4;
 
   PowerSources : array of string = ['Battery','External'];
   DeviceTypes : array of string = ['Generic','Camera','Media Player','Phone',
@@ -180,9 +180,12 @@ type
   TPortableDevice = class;
   TPortableDeviceContent = class;
 
-  TDeviceError = record
-    ErrorCode : integer;
-    ErrorId   : string;
+  TErrorList = class (TStringList)
+  private
+    function GetErrorCode (AIndex : integer) : cardinal;
+  public
+    procedure AddError (const ObjectId : string; ErrorCode : cardinal);
+    property Errorcode[Index : integer] : cardinal read GetErrorCode;
     end;
 
   TDeviceData = class (TObject)
@@ -208,7 +211,8 @@ type
     function GetChildCount : integer;
     function GetChild (Index : integer) : TPortableDeviceObject;
     function GetParentID : string;
-    function GetContentType : TGuid;
+    function GetContentGuid: TGuid;
+    function GetContentType : TContentType;
     function GetObjectName : string;
     function GetOriginalName : string;
     function GetDisplayName : string;
@@ -235,7 +239,8 @@ type
     function GetProperty (const PropertyKey : TPropertyKey; var pv : TPropVariant) : HResult;
     function CanWriteProperty (ObjectProperty : TObjectProperty) : boolean;
     function AddNameExtension (const AFilename : string) : string;
-    property ContentType : TGuid read GetContentType;
+    property ContentGuid : TGuid read GetContentGuid;
+    property ContentType : TContentType read GetContentType;
     property Index : integer read FIndex;
     property Level : integer read FLevel;
     property ObjectName : string read GetObjectName;
@@ -261,7 +266,7 @@ type
     FDevice  : TPortableDevice;
     FObjectList : TStringlist;
     FFindCallback : TFindObjects;
-    FLastError : TDeviceError;
+    FErrorObjects : TErrorList;
     function FindObjects (const AObjectID : string; AParent : TPortableDeviceObject) : boolean;
     function GetObjectCount : integer;
     function GetRootCount : integer;
@@ -277,7 +282,7 @@ type
     function GetObjectByID (const AObjectID : string) : TPortableDeviceObject;
     function GetObjectByPath (APath : string) : TPortableDeviceObject;
     function GetObjectIndexByPath (const APath : string) : integer;
-    property LastError : TDeviceError read FLastError;
+    property ErrorObjects : TErrorList read FErrorObjects;
     property ObjectCount : integer read GetObjectCount;
     property Objects[Index : integer] : TPortableDeviceObject read GetObject;
     property DeviceObject : TPortableDeviceObject read GetDevObject;
@@ -586,6 +591,17 @@ begin
   end;
 
 //-----------------------------------------------------------------------------
+function TErrorList.GetErrorCode (AIndex : integer) : cardinal;
+begin
+  Result:=cardinal(Objects[AIndex]);
+  end;
+
+procedure TErrorList.AddError (const ObjectId : string; ErrorCode : cardinal);
+begin
+  AddObject(ObjectId,pointer(ErrorCode));
+  end;
+
+//-----------------------------------------------------------------------------
 constructor TDeviceData.Create (const AName : string);
 begin
   inherited Create;
@@ -788,7 +804,7 @@ begin
   else Result:=FParentID;
   end;
 
-function TPortableDeviceObject.GetContentType : TGuid;
+function TPortableDeviceObject.GetContentGuid : TGuid;
 var
   pv : TPropVariant;
 begin
@@ -838,13 +854,18 @@ begin
 
 function TPortableDeviceObject.GetObjecType : TObjectType;
 begin
-  if ContentType=WPD_CONTENT_TYPE_FUNCTIONAL_OBJECT then begin
+  if ContentGuid=WPD_CONTENT_TYPE_FUNCTIONAL_OBJECT then begin
     if length(ParentID)=0 then Result:=otDevice
     else Result:=otRoot;
     end
-  else if ContentType=WPD_CONTENT_TYPE_FOLDER then Result:=otFolder
-  else if GetContentTypeFromGuid(ContentType) in FileObjects then Result:=otFile
+  else if ContentGuid=WPD_CONTENT_TYPE_FOLDER then Result:=otFolder
+  else if GetContentTypeFromGuid(ContentGuid) in FileObjects then Result:=otFile
   else Result:=otUnknown;
+  end;
+
+function TPortableDeviceObject.GetContentType : TContentType;
+begin
+  Result:=GetContentTypeFromGuid(ContentGuid);
   end;
 
 function TPortableDeviceObject.GetObjectFormat : TObjectFormat;
@@ -914,14 +935,12 @@ begin
   FDevice:=ADevice; FFindCallback:=nil;
   OleCheck(FDevice.pDevice.Content(pContent),'TPortableDeviceContent.Create:IPortableDevice.Content(');
   FObjectList:=TStringlist.Create;
-  with FLastError do begin
-    ErrorCode:=S_OK; ErrorId:='';
-    end;
+  FErrorObjects:=TErrorList.Create;
   end;
 
 destructor TPortableDeviceContent.Destroy;
 begin
-  FreeListObjects(FObjectList); FreeAndNil(FObjectList);
+  FreeListObjects(FObjectList); FreeAndNil(FObjectList); FreeAndNil(FErrorObjects);
   pContent:=nil;
   inherited Destroy;
   end;
@@ -963,16 +982,15 @@ begin
         end;
       end;
     objectIDArray:=nil;
+//    if n=10 then FErrorObjects.AddError(AObjectID,$80042009);   // for testing
     end
-  else with FLastError do begin
-    ErrorCode:=hr; ErrorId:=AObjectID;
-    end;
+  else FErrorObjects.AddError(AObjectID,hr);
 //  OleCheck(hr,'TPortableDeviceContent.FindObjects:IPortableDeviceContent.Next');
   end;
 
 function TPortableDeviceContent.Refresh (ACallBack : TFindObjects) : boolean;
 begin
-  FreeListObjects(FObjectList); FObjectList.Clear;
+  FreeListObjects(FObjectList); FObjectList.Clear; FErrorObjects.Clear;
   FFindCallback:=ACallBack;
   Result:=FindObjects(WPD_DEVICE_OBJECT_ID,nil);
   FFindCallback:=nil;
